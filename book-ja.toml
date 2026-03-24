@@ -1,11 +1,11 @@
 [book]
 authors = ["Promovolve Team"]
-language = "en"
-src = "src"
-title = "Promovolve: Ad Auction Algorithms & Architecture"
+language = "ja"
+src = "src-ja"
+title = "Promovolve: 広告オークションアルゴリズムとアーキテクチャ"
 
 [build]
-build-dir = "book/en"
+build-dir = "book/ja"
 
 [output.html]
 default-theme = "navy"

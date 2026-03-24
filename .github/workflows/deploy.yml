@@ -27,8 +27,8 @@ jobs:
           curl -sSL https://github.com/badboy/mdbook-mermaid/releases/download/v0.17.0/mdbook-mermaid-v0.17.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
           mv mdbook-mermaid /usr/local/bin/
 
-      - name: Build book
-        run: mdbook build
+      - name: Build book (English + Japanese)
+        run: bash build.sh
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
