@@ -4,27 +4,21 @@ Each campaign in Promovolve has its own **Double DQN reinforcement learning agen
 
 ## Architecture
 
-```
-┌──────────────────────────────────────┐
-│          CampaignEntity              │
-│                                      │
-│  ┌────────────────────────────────┐  │
-│  │   BidOptimizationAgent         │  │
-│  │                                │  │
-│  │  ┌──────────────────────────┐  │  │
-│  │  │      DQNAgent            │  │  │
-│  │  │  Q-network: [64, 64]    │  │  │
-│  │  │  Target network (copy)  │  │  │
-│  │  │  ReplayBuffer (10,000)  │  │  │
-│  │  │  ε-greedy (1.0 → 0.05) │  │  │
-│  │  └──────────────────────────┘  │  │
-│  │                                │  │
-│  │  bidMultiplier: [min, max]     │  │
-│  │  Window: imps, clicks, spend   │  │
-│  └────────────────────────────────┘  │
-│                                      │
-│  bidCpm = max(maxCpm × mult, floor)  │
-└──────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph CampaignEntity
+        subgraph BidOptimizationAgent
+            subgraph DQNAgent
+                QNet["Q-network: 64, 64"]
+                Target["Target network (copy)"]
+                Replay["ReplayBuffer (10,000)"]
+                Eps["ε-greedy (1.0 → 0.05)"]
+            end
+            BidMult["bidMultiplier: min, max"]
+            Window["Window: imps, clicks, spend"]
+        end
+        BidCpm["bidCpm = max(maxCpm × mult, floor)"]
+    end
 ```
 
 ## Two Speed Paths

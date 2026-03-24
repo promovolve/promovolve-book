@@ -20,20 +20,13 @@ This is also why Promovolve uses multi-candidate auctions. If the system only pi
 
 A creative goes through distinct states as it moves through the system:
 
-```
-Auction Result
-     │
-     ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Pending   │────►│  Approved   │────►│   Serving   │
-│  (in queue) │     │ (in index)  │     │ (to users)  │
-└─────────────┘     └─────────────┘     └─────────────┘
-     │                    │
-     ▼                    ▼
-┌─────────────┐     ┌─────────────┐
-│  Rejected   │     │   Revoked   │
-│ (blocked)   │     │ (removed)   │
-└─────────────┘     └─────────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: Auction Result
+    Pending --> Approved: Publisher approves
+    Approved --> Serving: Added to ServeIndex
+    Pending --> Rejected: Publisher rejects
+    Approved --> Revoked: Publisher revokes
 ```
 
 ### 1. Auction produces candidates

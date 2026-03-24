@@ -4,33 +4,28 @@ Promovolve runs as an Apache Pekko Cluster with three distinct node roles, Clust
 
 ## High-Level Components
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    Pekko Cluster                          │
-│                  (promovolve system)                      │
-│                                                          │
-│  ┌──────────┐   ┌──────────────┐   ┌──────────┐         │
-│  │ Singleton │   │    Entity    │   │   API    │         │
-│  │   Role    │   │     Role    │   │   Role   │         │
-│  │           │   │             │   │          │         │
-│  │ Campaign  │   │ Campaign    │   │ HTTP API │         │
-│  │ Directory │   │ Auctioneer  │   │ AdServer │         │
-│  │ Scheduler │   │ CategoryBid │   │ Events   │         │
-│  │           │   │ TaxonomyRnk │   │          │         │
-│  └──────────┘   │ Advertiser  │   └──────────┘         │
-│                  └──────────────┘                        │
-│                                                          │
-│  ┌──────────────────────────────────────────────┐       │
-│  │  DData (ServeIndex, PacingConfig, Blocklist) │       │
-│  │  Replicated across all nodes via gossip      │       │
-│  │  Durable: LMDB for shard-* and exhausted-*   │       │
-│  └──────────────────────────────────────────────┘       │
-│                                                          │
-│  ┌──────────────────────────────────────────────┐       │
-│  │  PostgreSQL (durable_state, snapshot tables)  │       │
-│  │  20 connections, 5 min pool                   │       │
-│  └──────────────────────────────────────────────┘       │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Cluster["Pekko Cluster (promovolve system)"]
+        subgraph Singleton["Singleton Role"]
+            CD["Campaign Directory"]
+            Sched["Scheduler"]
+        end
+        subgraph Entity["Entity Role"]
+            Camp["Campaign"]
+            Auct["Auctioneer"]
+            CatBid["CategoryBidder"]
+            TaxRnk["TaxonomyRanker"]
+            Adv["Advertiser"]
+        end
+        subgraph API["API Role"]
+            HTTP["HTTP API"]
+            AdSrv["AdServer"]
+            Evt["Events"]
+        end
+        DData["DData: ServeIndex, PacingConfig, Blocklist<br/>Replicated across all nodes via gossip<br/>Durable: LMDB for shard-* and exhausted-*"]
+        PG["PostgreSQL: durable_state, snapshot tables<br/>20 connections, 5 min pool"]
+    end
 ```
 
 ## Cluster Configuration

@@ -4,17 +4,13 @@ This chapter maps Promovolve's design choices against the traditional programmat
 
 ## Traditional Programmatic Stack
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐
-│Publisher  │────►│   SSP    │────►│ Exchange │
-│(webpage)  │     │(Supply)  │     │(auction) │
-└──────────┘     └──────────┘     └──────────┘
-                                       │
-                              ┌────────┼────────┐
-                              ▼        ▼        ▼
-                         ┌──────┐ ┌──────┐ ┌──────┐
-                         │ DSP1 │ │ DSP2 │ │ DSP3 │
-                         └──────┘ └──────┘ └──────┘
+```mermaid
+graph LR
+    Publisher["Publisher<br/>(webpage)"] --> SSP["SSP<br/>(Supply)"]
+    SSP --> Exchange["Exchange<br/>(auction)"]
+    Exchange --> DSP1["DSP1"]
+    Exchange --> DSP2["DSP2"]
+    Exchange --> DSP3["DSP3"]
 ```
 
 **Flow**: User loads page → SSP sends bid request → Exchange broadcasts to DSPs → DSPs respond within 100ms → Highest bid wins → Ad served.
@@ -25,11 +21,10 @@ Promovolve collapses the SSP, DSP, and exchange into a single system with two di
 
 ### Phase 1: Offline Auction (no user present)
 
-```
-┌──────────┐     ┌──────────────┐     ┌──────────┐
-│ Crawler  │────►│ Auctioneer   │────►│ServeIndex│
-│(scheduled)│     │(Pekko Shard) │     │ (DData)  │
-└──────────┘     └──────────────┘     └──────────┘
+```mermaid
+graph LR
+    Crawler["Crawler<br/>(scheduled)"] --> Auctioneer["Auctioneer<br/>(Pekko Shard)"]
+    Auctioneer --> ServeIndex["ServeIndex<br/>(DData)"]
 ```
 
 1. **Crawler** periodically fetches publisher pages and sends them to an LLM (Gemini Flash) for content classification into IAB taxonomy categories.
@@ -40,16 +35,13 @@ This phase re-runs on a schedule (every 5 minutes by default) and whenever conte
 
 ### Phase 2: Online Serve (user arrives)
 
-```
-┌──────────┐     ┌─────────────────────────────┐
-│  User    │────►│         API Node             │
-│(browser) │     │  ┌───────────┐  ┌─────────┐ │
-└──────────┘     │  │ServeIndex │─►│Thompson │ │
-                 │  │(local     │  │Sampling │ │
-                 │  │ DData     │  │+ Pacing │ │
-                 │  │ replica)  │  │         │ │
-                 │  └───────────┘  └─────────┘ │
-                 └─────────────────────────────┘
+```mermaid
+graph LR
+    User["User<br/>(browser)"] --> APINode
+
+    subgraph APINode["API Node"]
+        ServeIndex["ServeIndex<br/>(local DData replica)"] --> TS["Thompson Sampling<br/>+ Pacing"]
+    end
 ```
 
 The ServeIndex is not a separate service — it's a DData-replicated data structure, and every API node holds a local replica in its own process memory. There is no network call between the API node and the ServeIndex; it's a local in-memory lookup.

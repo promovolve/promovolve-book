@@ -7,3 +7,9 @@ title = "Promovolve: Ad Auction Algorithms & Architecture"
 [output.html]
 default-theme = "navy"
 preferred-dark-theme = "navy"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

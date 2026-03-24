@@ -26,18 +26,13 @@ That's why a PI controller — a well-understood, stable, analytically tractable
 
 ## Promovolve's Approach
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌───────────────┐
-│ Traffic Observer │ ──► │ PI Control   │ ──► │ Throttle Prob  │
-│ (EMA rate, 1s)  │     │ (self-tuning)│     │ [0.0, 0.99]   │
-└─────────────────┘     └──────────────┘     └───────────────┘
-       ▲                       │                     │
-       │                       ▼                     ▼
-       │               ┌──────────────┐     ┌───────────────┐
-       │               │ Traffic Shape│     │ Bernoulli     │
-       │               │ (weekday/wknd│     │ Serve or Skip │
-       └───────────────│  24h buckets)│     └───────────────┘
-                       └──────────────┘
+```mermaid
+graph LR
+    TO["Traffic Observer<br/>(EMA rate, 1s)"] --> PI["PI Control<br/>(self-tuning)"]
+    PI --> Throttle["Throttle Prob<br/>[0.0, 0.99]"]
+    PI --> Shape["Traffic Shape<br/>(weekday/weekend<br/>24h buckets)"]
+    Shape --> TO
+    Throttle --> Bernoulli["Bernoulli<br/>Serve or Skip"]
 ```
 
 ## Key Components

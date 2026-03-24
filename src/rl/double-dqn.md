@@ -25,14 +25,11 @@ Since θ and θ⁻ have different parameters, their noise is independent, breaki
 
 ## Network Architecture (DenseNetwork.scala)
 
-```
-Input Layer:  8 neurons (state dimensions)
-     │
-Hidden Layer 1: 64 neurons, ReLU activation
-     │
-Hidden Layer 2: 64 neurons, ReLU activation
-     │
-Output Layer: 5 neurons (Q-value per action, linear)
+```mermaid
+graph TD
+    Input["Input Layer: 8 neurons<br/>(state dimensions)"] --> H1["Hidden Layer 1: 64 neurons<br/>ReLU activation"]
+    H1 --> H2["Hidden Layer 2: 64 neurons<br/>ReLU activation"]
+    H2 --> Output["Output Layer: 5 neurons<br/>(Q-value per action, linear)"]
 ```
 
 Both Q-network and target network share this architecture.

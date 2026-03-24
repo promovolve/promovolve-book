@@ -66,15 +66,15 @@ Promovolve's design choices form a coherent system where each innovation enables
 
 ## The Unified Picture
 
-```
-LLM content classification
-  → Periodic batch auction (content changes slowly)
-    → Fair selection (per-campaign diversity guarantee)
-      → DData cache (multi-candidate, replicated locally)
-        → Thompson Sampling (explore among cached candidates)
-          → DQN bid optimization (learn to pace across days)
-            → Self-tuning PI pacing (smooth delivery within days)
-              → Buffered spend recording (correctness at scale)
+```mermaid
+graph TD
+    LLM["LLM content classification"] --> Auction["Periodic batch auction<br/>(content changes slowly)"]
+    Auction --> Fair["Fair selection<br/>(per-campaign diversity guarantee)"]
+    Fair --> DData["DData cache<br/>(multi-candidate, replicated locally)"]
+    DData --> TS["Thompson Sampling<br/>(explore among cached candidates)"]
+    TS --> DQN["DQN bid optimization<br/>(learn to pace across days)"]
+    DQN --> PI["Self-tuning PI pacing<br/>(smooth delivery within days)"]
+    PI --> Spend["Buffered spend recording<br/>(correctness at scale)"]
 ```
 
 Each choice enables the next. Remove one, and the system loses coherence. Together, they create an ad platform that is fast, learning, privacy-preserving, and publisher-aligned.
