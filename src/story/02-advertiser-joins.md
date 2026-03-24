@@ -1,0 +1,53 @@
+# Chapter 2: An Advertiser Joins
+
+Takeshi runs a small ryokan in Hakone. It's a family business — 8 rooms, a natural hot spring, views of the mountains. His guests are mostly travelers who found him through word of mouth or travel blogs. He wants to reach more of those readers.
+
+He's tried Google Ads. The interface was overwhelming. Keywords, bid strategies, quality scores, ad groups, campaign types — he spent more time learning the system than running the business. And the ads followed people around the internet: someone who Googled "Hakone ryokan" once would see his ad on cooking websites and news portals. That felt wrong.
+
+With Promovolve, Takeshi uploads a photo of his ryokan (a 300×250 JPEG), enters a landing page URL, sets a daily budget of $20, a maximum CPM of $5, and selects the content categories he wants to appear next to: Travel and Hiking/Camping.
+
+That's it. No keywords. No audience targeting. No bid strategy to configure. His ad will appear next to articles about travel and hiking — the exact context where someone would be interested in a ryokan.
+
+## What Happens Behind the Scenes
+
+When Takeshi creates his campaign, several things happen in the cluster:
+
+**A CampaignEntity is born.** An actor, sharded by advertiser ID and campaign ID, springs to life. It holds Takeshi's campaign state: max CPM ($5), daily budget ($20), creatives, status (active), and a fresh RL agent. The agent's bid multiplier starts at 1.0 — meaning the first bids will be at the full $5 CPM.
+
+**The creative is stored.** The ryokan photo is uploaded to R2 (Cloudflare's S3-compatible storage), hashed by SHA-256 for deduplication, and recorded in the creative repository with its dimensions, MIME type, and Takeshi's landing page URL.
+
+**The CampaignDirectory is notified.** A cluster singleton that tracks which campaigns are interested in which categories updates its registry: "Takeshi's campaign wants Travel and Hiking/Camping." This registry is what connects advertisers to auction opportunities.
+
+**The RL agent initializes.** A small neural network (8→64→64→5, about 4,800 parameters) is created inside the CampaignEntity. It knows nothing yet — its weights are randomly initialized, its epsilon is 1.0 (fully random exploration). It won't start learning until impressions flow in.
+
+## Publisher Approval
+
+Here's something that doesn't exist in traditional programmatic advertising: the publisher gets to say no.
+
+Before Takeshi's ryokan ad can appear on Yuki's travel blog, Yuki reviews it. She sees the creative, the landing page, and the advertiser's information in her publisher dashboard. She can:
+
+- **Approve** — the creative enters the ServeIndex and can be shown to readers
+- **Reject** — the creative is removed and the next candidate moves up
+- **Flag** — mark for review later
+
+This approval workflow is why Promovolve runs multi-candidate auctions. If the auction only picked one winner and the publisher rejected it, the slot would be empty. With multiple candidates, rejecting one just promotes the next.
+
+Yuki approves the ryokan ad. It fits her site perfectly.
+
+## Ready to Bid
+
+Takeshi's campaign is now in the system:
+- Creative uploaded and approved for Yuki's site
+- Categories registered: Travel, Hiking/Camping
+- Budget: $20/day, max CPM: $5
+- RL agent: initialized, bid multiplier = 1.0
+
+The next time the AuctioneerEntity for Yuki's site runs an auction — either from a fresh crawl or the 5-minute re-auction timer — Takeshi's campaign will be among the bidders.
+
+But Takeshi isn't the only advertiser. A regional JR rail pass campaign is also targeting Travel with a $8 CPM. A hiking gear company targets Hiking/Camping at $4 CPM. A new cooking class in Kyoto targets Food & Drink at $3 CPM.
+
+How does the system decide who gets which slot? That's the auction.
+
+---
+
+*Technical deep dives: [Entity Hierarchy](../architecture/entity-hierarchy.md) · [Bid Collection](../auction/bid-collection.md) · [Candidate Shortlisting](../auction/candidate-shortlisting.md)*

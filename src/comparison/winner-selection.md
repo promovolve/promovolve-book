@@ -1,0 +1,141 @@
+# Winner Selection: MAB vs Highest Bid
+
+Traditional exchanges pick a single winner — the highest bidder — and move on. Promovolve takes a fundamentally different approach: it shortlists multiple candidates at auction time, then uses Thompson Sampling at serve time to learn which creative actually performs best.
+
+## Traditional: Highest Bid Wins
+
+In a standard ad exchange, winner selection is simple:
+
+```
+Bids received:    $8.00,  $5.50,  $3.20
+Winner:           $8.00
+Price paid:       $5.51   (second-price: winner pays $0.01 above second bid)
+```
+
+The logic is purely financial: whoever is willing to pay the most gets the impression. The creative's quality, relevance to the page, or likelihood of being clicked plays no role in the decision.
+
+### Why this is a problem
+
+**CTR is invisible.** A campaign bidding $8 CPM with a 0.5% click-through rate beats a campaign bidding $3 CPM with a 5% CTR. The publisher serves a worse ad and makes less money per click. The advertiser with the better creative loses despite offering more value to readers.
+
+**There is no learning mechanism.** The exchange doesn't track whether the winning creative gets clicked. It doesn't know if the $8 bid was worth it. Each auction is independent — the system never gets smarter.
+
+**The winner's curse.** In a competitive auction, the highest bidder is statistically the one who overestimated the impression's value the most. Sophisticated DSPs account for this; small advertisers don't, and overpay.
+
+**New entrants can't compete.** A new advertiser with a potentially excellent creative but a conservative bid never wins, never gets impressions, and therefore never has a chance to prove itself. The system has no exploration — only exploitation of whoever bids highest today.
+
+## Promovolve: A Two-Phase Selection System
+
+Promovolve splits winner selection into two phases: **fair shortlisting** at auction time (when content is crawled) and **adaptive selection** at serve time (when a user arrives). This separation is the key design difference.
+
+### Phase 1: Auction-Time Fair Shortlisting
+
+Instead of picking a single winner, the AuctioneerEntity shortlists multiple candidates per ad slot with a per-campaign diversity guarantee:
+
+```
+3 campaigns, 3 slots → each campaign gets exactly 1 slot
+2 campaigns, 3 slots → each gets 1, fill the 3rd with the best remaining creative
+4 campaigns, 3 slots → top 3 by CPM each get 1 slot
+```
+
+The algorithm:
+1. Sort all candidates by CPM descending, with **pre-approved creatives preferred** as a tiebreaker (publishers can approve creatives before they enter the auction — approved creatives win ties over unapproved ones)
+2. Group by campaign, pick the best creative per campaign
+3. If there are more campaigns than slots, the top campaigns by CPM each get one slot
+4. If there are fewer campaigns than slots, every campaign is guaranteed representation, and remaining slots are filled with next-best creatives
+
+**Why this matters:** In a traditional exchange, a single high-budget campaign can monopolize every impression. Promovolve's diversity guarantee ensures that every participating campaign gets representation in the candidate pool, giving Thompson Sampling a diverse set to learn from.
+
+### Phase 2: Serve-Time Thompson Sampling
+
+When a user loads a page, Thompson Sampling selects among the shortlisted candidates. The scoring formula:
+
+```
+score = sampledCTR × log(1 + CPM)
+```
+
+Where `sampledCTR` is drawn from a Beta distribution based on observed performance over a 60-minute rolling window:
+
+```
+sampledCTR ~ Beta(clicks + 1, impressions - clicks + 1)
+```
+
+The `log(1 + CPM)` term gives higher bids an advantage, but with **diminishing returns**: a $10 CPM is only 3.5x better than a $1 CPM (not 10x). This means CTR dominates — a creative that readers actually click beats one that merely bids high.
+
+### A worked example
+
+Three campaigns competing for the same slot. Campaign C is brand new with no data:
+
+```
+Campaign A: $5.00 CPM, 150 impressions, 5 clicks
+  Beta(6, 146) → sample: 0.032
+  score = 0.032 × log(6.00) = 0.057
+
+Campaign B: $4.20 CPM, 22 impressions, 3 clicks
+  Beta(4, 20) → sample: 0.091
+  score = 0.091 × log(5.20) = 0.150
+
+Campaign C: $3.80 CPM, 0 impressions, 0 clicks
+  Beta(1, 1) → sample: 0.647  (uniform — could be anything)
+  score = 0.647 × log(4.80) = 1.016  ← wins (exploration)
+```
+
+Campaign C wins this request despite having the lowest CPM and no track record. This is **exploration** — the system gives the new creative a chance to prove itself. Over the next few dozen impressions, if C's true CTR turns out to be low, its Beta distribution narrows and it stops winning. If C turns out to be genuinely good, it earns a stable share of impressions.
+
+A traditional exchange would never serve Campaign C. It would never get data. It would never have a chance.
+
+### Cold start: getting new creatives off the ground
+
+Thompson Sampling needs data to work, so Promovolve uses specific strategies for new creatives depending on the state of the candidate pool:
+
+| Condition | Strategy | Behavior |
+|-----------|----------|----------|
+| All candidates have 0 impressions | **Full cold start** | Use `categoryScore ± noise` as estimated CTR — the auction's content-relevance signal bootstraps the first selections |
+| All candidates have < 10 impressions | **Warmup round-robin** | Always serve the candidate with the fewest impressions — ensures every creative gets at least 10 impressions before exploitation begins |
+| Some candidates are new, some have data | **Partial cold start** | 30% of the time, randomly pick a new creative; 70% run normal Thompson Sampling on all candidates |
+| All candidates have ≥ 10 impressions | **Standard** | Full Thompson Sampling |
+
+The 30% exploration rate for partial cold starts is aggressive by design — new creatives need data quickly, and Thompson Sampling's natural exploration handles the rest once they have enough impressions.
+
+### The full selection pipeline
+
+Thompson Sampling doesn't run in isolation. It's one step in a pipeline, and its position in that pipeline is deliberate:
+
+```
+1. ServeIndex lookup     → fetch cached candidates from local DData replica
+2. Content recency       → drop candidates if page content is stale (> 48h)
+3. Frequency cap         → drop candidates the user has seen too many times
+4. Pacing gate           → probabilistic throttle based on aggregate budget utilization
+5. Thompson Sampling     → score and select among remaining candidates
+6. Budget reservation    → reserve spend with the selected campaign
+```
+
+**Why pacing runs before Thompson Sampling:** If pacing ran after selection, Thompson Sampling would pick a creative, then pacing would sometimes throw it away. That wastes an exploration opportunity — we showed nothing, we learned nothing. By putting the pacing gate first, every request that makes it to Thompson Sampling produces a served impression and useful data.
+
+### Budget reservation and graceful fallback
+
+After Thompson Sampling selects a winner, the system attempts to reserve the spend:
+
+```
+1. Reserve spend with CampaignEntity
+2. Verify budget status with AdvertiserEntity
+3. On failure (budget exhausted) → try the next-best candidate by Thompson score
+4. All candidates exhausted → return NoCandidates (HTTP 204)
+```
+
+In a traditional exchange, if the winner can't pay, the auction fails and the slot goes unfilled (or a low-quality fallback ad appears). Promovolve's multi-candidate model means there's always a next-best option waiting — graceful degradation without re-running the auction.
+
+## Side-by-Side Comparison
+
+| Dimension | Traditional (Highest Bid) | Promovolve (Thompson Sampling) |
+|-----------|--------------------------|-------------------------------|
+| **Selection criterion** | Price only | CTR × log-compressed price |
+| **Number of candidates** | 1 winner | Multiple shortlisted per slot |
+| **Learning** | None — each auction is independent | Continuous — every impression updates the Beta posterior |
+| **New creative discovery** | Impossible without outbidding the incumbent | Built-in via exploration; 30% forced exploration for brand-new creatives |
+| **Cold start** | New advertiser must bid high to win | Round-robin warmup guarantees initial data collection |
+| **Failure handling** | Slot goes unfilled | Fall through to next-best candidate |
+| **Publisher alignment** | Optimizes for advertiser spend | Optimizes for reader engagement (CTR), weighted by spend |
+| **Short-term revenue** | Higher (always picks highest bid) | Sometimes lower (explores lower-CPM creatives) |
+| **Long-term revenue** | Stagnant (no learning) | Higher (discovers high-CTR creatives that earn more clicks) |
+| **Advertiser ROI** | Favors large budgets | Favors creative quality — a good ad at $3 CPM can beat a bad ad at $8 CPM |
