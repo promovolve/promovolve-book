@@ -32,12 +32,15 @@ AuctioneerEntity (sharded by siteId)
         └── Virtual sharding: hash(siteId) % 5
 
 CampaignDirectory (ClusterSingleton)
+  ├── Reverse index: CategoryId → Map[CampaignId, AdvertiserId]
+  ├── Routes updates via CampaignDistributor (8 workers)
+  │     └── Fan-out to CategoryBidderEntity shards
   └── 60-second reconciliation cycle
 ```
 
 ## Sharding戦略
 
-各entityタイプは、そのアクセスパターンに最適化された異なるshard keyを使用します:
+各entityタイプは、そのアクセスパターンに最適化された異なるshard keyを使用する:
 
 | Entity | Shard Key | Shards | 根拠 |
 |--------|-----------|--------|-----------|
@@ -59,7 +62,7 @@ CampaignDirectory (ClusterSingleton)
 - **Passivation**: 5分間の非アクティブ後
 
 ### CampaignEntityの支出記録
-支出パスは正確性を重視して設計されています:
+支出パスは正確性を重視して設計されている:
 1. **バッファリング**: 500msタイマー、または20イベントのバッチ（先に発火した方が優先）
 2. **冪等性**: 50Kエントリの Bloom filter (0.01% FPP) + 50KのScaffeine cache (5分TTL)
 3. **At-least-once**: 保留中のレポートはexponential backoffでリトライ（100ms → 5s、最大5回）

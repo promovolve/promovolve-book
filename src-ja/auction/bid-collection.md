@@ -1,18 +1,18 @@
 # フェーズ3: 入札収集
 
-選択された各カテゴリに対して、システムはすべてのアクティブなキャンペーンにファンアウトし、入札を収集します。これはオークションの中で最も分散化されたフェーズです。
+選択された各カテゴリに対して、システムはすべてのアクティブなキャンペーンにファンアウトし、入札を収集する。これはオークションの中で最も分散化されたフェーズである。
 
 ## CategoryBidderEntity
 
-各`(category, siteId)`ペアは負荷を分散するために**5つの仮想シャード**を使用します。シャードは`hash(siteId) % 5`で選択されるため、実際のエンティティキーは`category|siteId|shardIndex`となります。
+各`(category, siteId)`ペアは負荷を分散するために**5つの仮想シャード**を使用する。シャードは`hash(siteId) % 5`で選択されるため、実際のエンティティキーは`category|siteId|shardIndex`となる。
 
 ## CampaignDistributor
 
-各CategoryBidderEntity内で、`CampaignDistributor`は**8つのワーカーアクター**を使用して個々のキャンペーンへのファンアウトを管理し、`hash(categoryId) % 8`でルーティングします。
+各CategoryBidderEntity内で、`CampaignDistributor`は**8つのワーカーアクター**を使用して個々のキャンペーンへのファンアウトを管理し、`hash(categoryId) % 8`でルーティングする。
 
 ## 入札リクエストからレスポンスへ
 
-各CampaignEntityはリクエストを評価し、適格なクリエイティブで応答します。入札CPMは以下のように計算されます:
+各CampaignEntityはリクエストを評価し、適格なクリエイティブで応答する。入札CPMは以下のように計算される:
 
 ```scala
 bidCpm = max(maxCpm × bidMultiplier, floorCpm)
@@ -23,22 +23,23 @@ bidCpm = max(maxCpm × bidMultiplier, floorCpm)
 - `bidMultiplier`: RLエージェントの現在の乗数。`[minMultiplier, maxMultiplier]`にクランプされる
 - `floorCpm`: システムのフロア価格（デフォルト: $0.50）
 
-RLエージェントは、乗数が低い場合でも入札がフロア価格を下回らないことを保証します。
+RLエージェントは、乗数が低い場合でも入札がフロア価格を下回らないことを保証する。
 
 ## 適格性フィルター（キャンペーン側）
 
-CampaignEntityが応答しないケース:
+以下のチェックのいずれかに失敗した場合、CampaignEntityは応答しない:
 
-1. **予算枯渇**: `dailyBudget - (spendToday + bufferedSpend) <= 0`
-2. **日付を考慮したチェック**: `lastResetInstant`以降にカレンダー日が変わった場合、予算はリセットされたものとして扱われる（遅延リセット）
+1. **カテゴリ不一致**: ページのカテゴリがキャンペーンの`categories`セットに含まれていない — これが主要なフィルターである。キャンペーンのカテゴリはAd Product Taxonomy 2.0のIDから`ContentToAdProductMapping`を通じて導出され、Content Taxonomy 2.1のIDセットにマッピングされる。マッチングは**厳密**: `state.categories.contains(pageCategory)`
+2. **カテゴリがブロックリストに該当**: カテゴリがキャンペーンの`categoryBlocklist`に含まれている（明示的な除外）
 3. **ステータスが一時停止**: キャンペーンの`status != Active`
-4. **サイトがブロックリストに該当**: パブリッシャーのサイトが広告主の`siteBlacklist`に含まれている
-5. **適合するサイズがない**: キャンペーンの`allowedSizes`のいずれもスロットの`AdSlotConfig(width, height)`に合致しない
-6. **カテゴリがブロックリストに該当**: カテゴリがキャンペーンの`categoryBlocklist`に含まれている
+4. **予算枯渇**: `dailyBudget - (spendToday + bufferedSpend) <= 0`
+5. **日付を考慮したチェック**: `lastResetInstant`以降にカレンダー日が変わった場合、予算はリセットされたものとして扱われる（遅延リセット）
+6. **サイトがブロックリストに該当**: パブリッシャーのサイトが広告主の`siteBlacklist`に含まれている
+7. **適合するサイズがない**: キャンペーンの`allowedSizes`のいずれもスロットの`AdSlotConfig(width, height)`に合致しない
 
 ## 集約ルール
 
-CategoryBidderEntityはレスポンスを集約します:
+CategoryBidderEntityはレスポンスを集約する:
 
 1. **CPM閾値**: 最高CPMの**上位20%**以内の候補のみが残される: `cpm ≥ maxCpm × (1.0 - 0.20)`
 2. **キャンペーン上限**: カテゴリあたり最大**50キャンペーン**（`maxCampaignsPerCategory`）、CPMの降順でランク付け
@@ -46,7 +47,7 @@ CategoryBidderEntityはレスポンスを集約します:
 
 ## レスポンス構造
 
-適格な各クリエイティブは`Candidate`としてラップされます:
+適格な各クリエイティブは`Candidate`としてラップされる:
 
 ```scala
 Candidate(
