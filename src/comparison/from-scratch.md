@@ -82,7 +82,7 @@ Promovolve doesn't try to improve the traditional stack. It replaces the fundame
 
 The entire SSP/DSP/DMP chain exists because the system decided to target users. Remove that decision, and most of the machinery becomes unnecessary.
 
-Promovolve classifies page content using an LLM: "This article is about Travel > Asia > Japan > Kyoto, Architecture, Cultural Heritage." An advertiser says: "Show my ad next to content about travel in Japan." The match is direct — content to category, category to advertiser. No user profile needed. No DMP. No cookies.
+Promovolve classifies page content using an LLM into IAB Content Taxonomy 2.1 categories: "This article is about Destinations, Outdoor Recreation, Cultural Tourism." Meanwhile, an advertiser says: "My product is Travel" (IAB Ad Product Taxonomy 2.0). The system automatically derives which content categories match that product using the official IAB mapping — no manual configuration. The match happens between content and product, not content and user. No user profile needed. No DMP. No cookies.
 
 This is the magazine model, automated. The technology that makes it work at scale — cheap, accurate LLM classification — didn't exist five years ago.
 

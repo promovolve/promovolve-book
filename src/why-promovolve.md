@@ -102,7 +102,7 @@ Promovolve lowers the bar to zero. An advertiser is anyone with an image and a l
 - A **small hotel in Kyoto** reaching readers of a travel article about their neighborhood
 - A **global brand** running a campaign across a network of niche publishers
 
-There's no DSP to integrate with. No bid strategy to configure manually — the RL agent learns the right price. No user profiles to buy. Just: "here's my ad, here's my budget, here are the content categories I want to appear next to." The system handles the rest.
+There's no DSP to integrate with. No bid strategy to configure manually — the RL agent learns the right price. No user profiles to buy. Just: "here's my ad, here's my budget, here's what my product is." The advertiser picks an ad product category (e.g., "Travel" or "Kitchen Equipment"), and the system automatically derives which content categories match — using the official IAB mapping between Ad Product Taxonomy 2.0 and Content Taxonomy 2.1. The system handles the rest.
 
 This is how magazine advertising worked. A local restaurant could buy a quarter-page in a neighborhood magazine. The scale matched the business. Promovolve brings that accessibility to the web.
 

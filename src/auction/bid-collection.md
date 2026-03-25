@@ -27,14 +27,15 @@ The RL agent ensures the bid never falls below floor even with a low multiplier.
 
 ## Eligibility Filters (Campaign-Side)
 
-A CampaignEntity will not respond if:
+A CampaignEntity will not respond if any of these checks fail:
 
-1. **Budget exhausted**: `dailyBudget - (spendToday + bufferedSpend) <= 0`
-2. **Day-aware check**: If the calendar day changed since `lastResetInstant`, the budget is treated as fresh (reset happens lazily)
+1. **Category mismatch**: The page category is not in the campaign's `categories` set — this is the primary filter. The campaign's categories are derived from its Ad Product Taxonomy 2.0 ID via `ContentToAdProductMapping`, which maps to a set of Content Taxonomy 2.1 IDs. Matching is **exact**: `state.categories.contains(pageCategory)`
+2. **Category blocklisted**: The category is in the campaign's `categoryBlocklist` (explicit exclusions)
 3. **Status paused**: Campaign `status != Active`
-4. **Site blocklisted**: Publisher's site is on the advertiser's `siteBlacklist`
-5. **No matching sizes**: None of the campaign's `allowedSizes` fit the slot's `AdSlotConfig(width, height)`
-6. **Category blocklisted**: The category is in the campaign's `categoryBlocklist`
+4. **Budget exhausted**: `dailyBudget - (spendToday + bufferedSpend) <= 0`
+5. **Day-aware check**: If the calendar day changed since `lastResetInstant`, the budget is treated as fresh (reset happens lazily)
+6. **Site blocklisted**: Publisher's site is on the advertiser's `siteBlacklist`
+7. **No matching sizes**: None of the campaign's `allowedSizes` fit the slot's `AdSlotConfig(width, height)`
 
 ## Aggregation Rules
 

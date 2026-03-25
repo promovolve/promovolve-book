@@ -32,6 +32,9 @@ AuctioneerEntity (sharded by siteId)
         └── Virtual sharding: hash(siteId) % 5
 
 CampaignDirectory (ClusterSingleton)
+  ├── Reverse index: CategoryId → Map[CampaignId, AdvertiserId]
+  ├── Routes updates via CampaignDistributor (8 workers)
+  │     └── Fan-out to CategoryBidderEntity shards
   └── 60-second reconciliation cycle
 ```
 
