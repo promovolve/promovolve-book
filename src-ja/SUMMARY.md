@@ -78,6 +78,18 @@
   - [TTLスイープと有効期限](./distributed/ttl-sweep.md)
   - [書き込み一貫性レベル](./distributed/consistency.md)
 
+## 広告入札を通じてRLを学ぶ
+
+- [広告入札を通じて強化学習を学ぶ](./rl-tutorial/index.md)
+  - [問題：なぜ入札最適化にRLが必要なのか](./rl-tutorial/01-the-problem.md)
+  - [RL基礎：Agent、Environment、Reward](./rl-tutorial/02-fundamentals.md)
+  - [ニューラルネットワークをゼロから構築する](./rl-tutorial/03-neural-network.md)
+  - [Q-TableからDeep Q-Networksへ](./rl-tutorial/04-dqn.md)
+  - [Experience Replay：過去から学ぶ](./rl-tutorial/05-replay-buffer.md)
+  - [Double DQN：過大評価の修正](./rl-tutorial/06-double-dqn.md)
+  - [すべてを組み合わせる：BidOptimizationAgent](./rl-tutorial/07-full-agent.md)
+  - [本番環境での学習](./rl-tutorial/08-production.md)
+
 ## 従来のアドテクとの比較
 
 - [Promovolve vs SSP/DSP/Exchange](./comparison/vs-traditional.md)
