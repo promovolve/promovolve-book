@@ -1,279 +1,418 @@
-# ゼロから学ぶ強化学習
+# Reinforcement Learningをゼロから学ぶ
 
-この章では、Promovolveの入札最適化を実行例として使いながら、RLをゼロから解説します。最後まで読めば、`DQNAgent.scala`と`BidOptimizationAgent.scala`のすべての行を理解できるようになります。
+この章では、Promovolveの入札最適化を題材として、RLをゼロから解説します。読み終わる頃には、`DQNAgent.scala`と`BidOptimizationAgent.scala`のすべての行を理解できるようになります。機械学習の予備知識は不要です。
 
-## セットアップ：世界の中のエージェント
+---
 
-あなたが1つの広告キャンペーンを管理していると想像してください。1日の予算は$100で、最大入札額は$5 CPM（1,000インプレッションあたりのコスト）です。15分ごとに状況を確認し、オークションで勝つためにより高く入札すべきか、予算を節約するために低く入札すべきかを決定します。
+## 問題：決定が多すぎて、時間が足りない
 
-これは**強化学習**の問題です。以下の要素があります：
+あなたが1つの広告キャンペーンを管理しているとしましょう。1日の予算は100ドル、最大入札額はCPM 5ドル（1,000インプレッションあたりのコスト）です。15分ごとに状況を確認し、オークションに勝つために入札額を上げるべきか、予算を節約するために下げるべきかを判断します。
 
-- **エージェント** — 入札戦略（Promovolveでは：`BidOptimizationAgent`）
-- **環境** — 広告オークション市場（他のキャンペーン、ユーザートラフィック、クリックパターン）
-- **State** — 現在の状況について観測できるもの（残り予算、残り時間、クリック率など）
-- **Action** — 実行できること（入札を上げる、下げる、維持する）
-- **Reward** — どれだけうまくいったかのフィードバック（獲得クリック数、過剰消化のペナルティを差し引いたもの）
+手動で対処しようとすることもできるでしょう。しかし、広告マーケットプレイスは生き物です——競合他社は入札を変え、ユーザートラフィックは増減し、コンテンツによってクリック率は異なります。今日書いた固定ルールは明日には通用しなくなります。
 
-エージェントの目標：時間を通じた総報酬を最大化する**方策** — stateからactionへのマッピング — を学習することです。
+本当に必要なのは、新入社員が最初の数週間で仕事が上達していくのと同じように、経験から*学習する*システムです。それがreinforcement learningです。
 
-## なぜルールベースではダメなのか？
+---
 
-ルールを書くことはできます：「予算が60%以上残っていて正午を過ぎていたら、入札を上げる」。しかし：
+## 設定：Agent、Environment、Reward
 
-- 適切な閾値が事前にわからない
-- 正しい戦略は競合他社の行動に依存し、それは変化する
-- トラフィックパターンは日や季節によって異なる
-- キャンペーンごとに最適な戦略が異なる
+すべてのRL問題には同じ3つの要素があります。
 
-RLは経験から自動的にこれらのルールを学習します。エージェントはさまざまなactionを試し、何が起こるかを観察し、徐々に何がうまくいくかを理解していきます。
+**Agent**は意思決定者です。Promovolveでは、agentは`BidOptimizationAgent`——入札の積極度を決定するコードです。これはアクターではなく、`CampaignEntity`アクターの内部に埋め込まれた普通のScalaオブジェクトで、各観測時に同期的に呼び出されます。
 
-## Reward信号
+**Environment**はagentが制御できないすべてのものです：他の広告主の入札、ブラウジングしているユーザー数、閲覧しているコンテンツ。agentはenvironmentを観察できますが、直接変更することはできません。反応することしかできないのです。
 
-Rewardはエージェントが得る唯一のフィードバックです。これが「良い」とは何かを定義します。
+**Reward**はagentの成果を伝えるシグナルです。各決定の後、environmentは1つの数値を返します：うまくいった場合は正、うまくいかなかった場合は負です。agentの唯一の目標は、時間の経過とともに収集するrewardの総量を最大化することです。
 
-Promovolveでは、15分ごとにエージェントが受け取るのは：
+それだけです。この章のすべては、このループを機能させるための仕組みにすぎません。
+
+---
+
+## なぜルールを書くだけではダメなのか？
+
+最初に思いつくのは、ロジックをハードコードすることです：「予算が60%以上残っていて正午を過ぎていたら、入札を上げる」。しかし、このようなルールはいくつかの理由で破綻します：
+
+- 正しい閾値を事前に知ることができない。60%が正しいカットオフなのか？55%かもしれないし、70%かもしれない。
+- 最適なルールは競合他社の行動に依存するが、それは見えず、常に変化している。
+- トラフィックパターンは日、季節、コンテンツタイプによって異なる。
+- キャンペーンごとに最適な戦略は異なる。
+
+RLはこのすべてを回避します。ルールを書く代わりに、「良い」とは何かを定義し（reward）、agentに試行錯誤を通じて自らルールを見つけさせるのです。
+
+---
+
+## Agentが観察するもの
+
+15分ごとに、agentは世界を見渡し、現在の状況のスナップショットを構築します。Promovolveでは、このスナップショット——**state**と呼ばれる——は8つの数値で構成されます：
+
+| Measurement | Example |
+|---|---|
+| Current effective CPM | $3.20 |
+| Click-through rate this window | 0.03 (3%) |
+| Bid win rate this window | 0.65 (65%) |
+| Fraction of daily budget remaining | 0.70 (70%) |
+| Fraction of day remaining | 0.50 (50%) |
+| Current spend rate vs. ideal pace | 1.10 (10% ahead of pace) |
+| Impression rate | 0.80 |
+| Cost per click | $0.40 |
+
+これら8つの数値をまとめると、agentが置かれている状況を表現できます。チェスプレイヤーが次の手を決める前に盤面を見るのと同じように、agentはactionを決定する前にこのstateを見ます。
+
+---
+
+## Agentができること
+
+stateが与えられると、agentは7つのactionのうち1つを選択します：
+
+| Action | Multiplier | Meaning |
+|--------|-----------|---------|
+| 0 | 0.7× | Bid much lower — conserve budget aggressively |
+| 1 | 0.8× | Bid lower |
+| 2 | 0.9× | Bid slightly lower |
+| 3 | 1.0× | Hold steady |
+| 4 | 1.1× | Bid slightly higher |
+| 5 | 1.2× | Bid higher |
+| 6 | 1.4× | Bid much higher — be aggressive |
+
+multiplierは現在の入札レベルに累積的に適用され、[0.5, 2.0]にクランプされます。agentはマーケットを変えることはできません。入札の積極度を調整し、次に何が起こるかを観察することしかできないのです。
+
+---
+
+## Rewardシグナル
+
+15分間のウィンドウごとに、agentはrewardを受け取ります。Promovolveでは、次のように計算されます：
 
 ```
-reward = clicks_in_window − penalty
-
-where penalty = 2.0 × max(0, spend_rate − 1.5)
+pacingScore = max(0.1, 1.0 - |spendRate - 1.0|)
+reward = clicks × pacingScore - exhaustionPenalty × timeRemaining
 ```
 
-- **クリック**が主要な目標 — エンゲージメントを求めています
-- **ペナルティ**は消化レートが理想的なペースの1.5倍を超えた場合にのみ発動 — 若干の過剰消化は許容されますが、正午までに予算を使い果たすのは問題です
+平易に言うと：
 
-これが`BidOptimizationAgent.computeReward()`のreward functionです。エージェントが学習するすべてのことは、この単一の信号から生まれます。
+- **ペーシング品質でスケーリングされたクリック数。** キャンペーンが完璧なペース（spendRate = 1.0）のとき、すべてのクリックが満額でカウントされます。2倍の速度で過剰支出している場合、各クリックの価値は10%に下がります。0.5倍で過少支出の場合、各クリックの価値は50%です。どちらの方向もペナルティを受けるため、agentは過剰入札で有利にすることはできません。
+- **予算枯渇はペナルティが時間に比例。** 1日の80%を残して予算を使い果たすことは、20%を残して使い果たすよりも4倍悪いとされます。これにより、早期の予算枯渇は後半の枯渇よりもより多くの潜在的クリックを無駄にすることをagentに教えます。
 
-## Q-Values：Actionの評価
+この1つの数式が、agentが受け取る唯一の「成功」の定義です。agentが学習するすべてはこのシグナルから生まれます。reward関数を変更すれば、agentはまったく異なる戦略を学習します。
 
-Q-learningの核となるアイデアがここにあります。エージェントが取り得るすべてのstateについて、**各actionはどれくらい良いか？**を知りたいのです。
+---
 
-**Q-value** `Q(state, action)`は次の問いに答えます：「このstateでこのactionを取り、その後最適に行動した場合、どれだけの総報酬を得られるか？」
+## 経験からの学習：核心となるアイデア
+
+根本的な問いはこうです：agentはどのようにして*どの状況でどのactionを取るべきか*を学ぶのでしょうか？
+
+端的に言えば：何が起こったかを記憶し、期待値を調整することによってです。
+
+agentが予算70%でクリック率が高い状態にあり、入札を上げることにしたとしましょう。より多くのオークションに勝ち、より多くのクリックを獲得し、良いrewardを得ます。これで「この状況で入札を上げる」のは利益のある行動だとわかりました。
+
+しかし、ここに微妙な点があります：agentは即時のrewardだけを気にするのではありません。*その日の残り全体で収集するrewardの総量*を気にするのです。積極的に入札すれば今すぐ多くのクリックを得られるかもしれませんが、午後2時までに予算を使い果たせば、残りの1日は何も得られず——ペーシングペナルティが厳しくのしかかります。
+
+これが、RLが個々の決定ではなく**一連の決定**を重視する理由です。
+
+---
+
+## Q-Values：すべての選択肢をスコアリングする
+
+一連の決定について推論するために、agentは**Q-value**と呼ばれる概念を使います。
+
+`Q(state, action)`は、次の質問に対するagentの推定値です：*「この状況にいて、このactionを取り、その後残りの1日を最適にプレイした場合——合計でどれだけのrewardを獲得できるか？」*
 
 例えば：
-- State：予算70%残、時間50%残、CTRが高い
-- `Q(state, bid_higher)` = 12.5（ここで入札を上げると将来の報酬が12.5になる傾向がある）
-- `Q(state, hold)` = 10.0
-- `Q(state, bid_lower)` = 7.3
 
-エージェントは最も高いQ-valueを持つactionを選ぶだけです。難しいのは正確なQ-valueの学習です。
+| Action | Multiplier | Q-value |
+|--------|-----------|---------|
+| 0 | 0.7× | 7.3 |
+| 1 | 0.8× | 9.1 |
+| 2 | 0.9× | 10.0 |
+| 3 | 1.0× | 11.2 |
+| 4 | 1.1× | 12.5 |
+| 5 | 1.2× | 11.8 |
+| 6 | 1.4× | 9.4 |
 
-## Bellman方程式：経験からの学習
+これらのQ-valuesから、agentはaction 4（入札をわずかに上げる）を選択します——Q-value 12.5が最も良い推定結果です。最も積極的なaction（1.4×）のQ-valueは穏当なものより低いことに注目してください——agentは過剰入札がペーシングを損なうことを学習したのです。
 
-actionを取った後、エージェントは何が起きたかを観察します：
+agentは将来について明示的に考える必要がありません。Q-valuesを参照し、最も高いものを選ぶだけです。長期的な推論はすべてQ-values自体に織り込まれています。
+
+もちろん難しいのは、そもそも正確なQ-valuesを持つことです。それが訓練の目的です。
+
+---
+
+## Bellman Equation：Q-Valuesの由来
+
+Q-valuesはどのように計算されるのでしょうか？**Bellman equation**と呼ばれる美しくシンプルな観察を通じてです。
+
+次のように考えてください：あるactionの価値は2つのものを足し合わせたものに等しいです：
+1. 今すぐ得られる即時reward
+2. 次のstateから先で得られる最善の結果
+
+数式で書くと：
+
+```
+Q(state, action) = immediate_reward + γ × max Q(next_state, any_action)
+```
+
+**γ（gamma）**は0から1の間の数値で、Promovolveでは0.99です。これは、agentが即時のrewardと比較して将来のrewardをどれだけ重視するかを表します。
+
+なぜ将来を割引するのでしょうか？今のrewardは後の同じrewardよりも価値があるからです——そこに到達する前に予算が尽きるかもしれません。γ = 0.99の場合、1ステップ後のrewardは今のrewardの0.99の価値があります。100ステップ後のrewardは0.99^100 ≈ 0.37の価値しかありません。agentはより早い結果を好みます。
+
+Bellman equationは難しい問題（将来のreward総量を予測する）を扱いやすい問題に変換します：即時rewardを予測し、次のstateからブートストラップするのです。
+
+---
+
+## 近似の問題
+
+もしstateがチェスボードの64マスのように小さな固定の集合であれば、Q-valueテーブルをメモリに保存できるでしょう。1行がstate、1列がactionです。
+
+しかし、Promovolveのstateは8つの連続した数値です。予算残高は0.70かもしれないし、0.701かもしれないし、0.7001かもしれません。可能なstateは無限に存在します。テーブルは論外です。
+
+ここで**neural network**の出番です——neural networkが魔法だからではなく、ある特定のことが非常に得意だからです：例から関数を学習することです。
+
+---
+
+## Neural Networks：関数近似器
+
+neural networkは、多くの調整可能なダイヤルを持つ数学的関数にすぎません。
+
+入力としていくつかの数値を与えます。一連の計算が行われます。出力としていくつかの数値が生成されます。ダイヤル——**weights**と呼ばれる——がその計算の内容を決定します。
+
+Promovolveでは、ネットワークは次のようになっています：
+
+```
+Input: [0.7, 0.03, 0.65, 0.70, 0.50, 1.1, 0.8, 0.4]
+  (8 numbers describing the current state)
+         ↓
+   [64 intermediate values]
+         ↓
+   [64 intermediate values]
+         ↓
+Output: [7.3, 9.1, 10.0, 11.2, 12.5, 11.8, 9.4]
+  (Q-values for each of the 7 actions)
+```
+
+中間層は、ネットワークが自明でないパターンを学習できるようにするために存在します。「高い落札率かつ低い予算残高」は、どちらの指標単独では明らかにならない何かを示しているかもしれません。中間層は、ネットワークにそうした組み合わせを発見する余地を与えます。
+
+これがコード上の`DenseNetwork.forward()`です。ネットワークは合計で約5,200のパラメータを持っています。
+
+重要なポイント：このネットワークは**汎化**します。一度訓練されると、見たことのないstateに対しても、似たstateから補間することで、妥当なQ-value推定を生成できます。neural networkをルックアップテーブルの代わりに使う理由はまさにこの点にあります。
+
+---
+
+## 訓練：ダイヤルの調整
+
+訓練とは、ネットワークのweightsを調整して、Q-value推定が正確になるようにするプロセスです。
+
+agentがactionを取るたびに、**transition**を観察します：
 
 ```
 (state, action, reward, next_state)
 ```
 
-例えば：「予算70%でCTRが高い状態で、入札を上げて、3クリック（reward=3.0）を得て、今は予算65%でCTRがわずかに低い状態になった。」
+例えば：「state [0.7, 0.03, ...]にいて、action 4（入札をわずかに上げる）を選び、reward 2.7を獲得し、今はstate [0.65, 0.028, ...]にいる。」
 
-**Bellman方程式**は次のように述べます：
+このtransitionから、訓練は3つのステップで進みます：
 
+**1. 予測。** 現在のstateをネットワークに通し、取ったactionに対する予測Q-valueを得る。
+
+**2. あるべき値を計算。** Bellman equationを使って：
 ```
-Q(state, action) = reward + γ × max_a Q(next_state, a)
-```
-
-訳すと：あるstateでactionを取ることの価値は、即時のrewardに加えて、次のstateからの割引された最良の価値に等しい。
-
-**γ (gamma)**は**discount factor**（Promovolveでは0.99）です。これは将来のrewardが即時のものよりわずかに価値が低いことを意味します。次のステップでのreward 1.0は現在0.99の価値があります。100ステップ先のrewardは0.99^100 ≈ 0.37の価値です。これにより、エージェントが無限に辛抱強くなることを防ぎ、より早いrewardを好むようになります。
-
-## テーブルからニューラルネットワークへ
-
-stateが単純（グリッド位置など）であれば、Q-valueをテーブルに格納できます。しかしPromovolveのstateは8つの連続次元を持ちます — 予算割合、時間割合、CTR、勝率など。可能なstateは無限にあります。テーブルでは対応できません。
-
-代わりに、**ニューラルネットワーク**を使ってQ関数を近似します。ネットワークはstate（8つの数値）を入力として受け取り、各action（5つの数値）のQ-valueを出力します：
-
-```
-Input: [0.7, 0.03, 0.65, 0.70, 0.50, 1.1, 0.8, 0.4]
-         ↓
-   [64 neurons, ReLU] → [64 neurons, ReLU] → [5 outputs, linear]
-         ↓
-Output: [12.5, 10.0, 7.3, 11.2, 9.8]
-          ↑
-     Q-values for each action
-     (pick the highest: action 0, bid lower aggressively)
+target = 2.7 + 0.99 × (best Q-value from next state)
 ```
 
-これがコード中の`DenseNetwork.forward()`です。ネットワークには学習によって獲得される約4,800個のパラメータ（重みとバイアス）があります。
+**3. 調整。** 予測がtargetに近づくように、weightsをわずかに修正する。予測が10.0でtargetが12.5なら、出力を12.5に近づける方向に、すべてのweightが微小量だけ調整される。
 
-## 学習：ネットワークがどのように学ぶか
+この修正プロセス——gradient descentと呼ばれる——が`DenseNetwork.train()`で実装されているものです。これを数万回繰り返すことで、ネットワークの推定値は徐々に正確なQ-valuesに収束していきます。
 
-学習は以下を繰り返し行います：
+---
 
-1. **予測**：ネットワークをフォワードパスで実行し、あるstateの予測Q-valueを得る
-2. **ターゲット計算**：Bellman方程式を使って、Q-valueが*あるべき*値を計算する
-3. **更新**：予測をターゲットに近づけるようにネットワークの重みを調整する
+## Experience Replay：相関を断ち切る
 
-具体的に、遷移`(state, action=2, reward=3.0, next_state)`の場合：
+transitionを1つずつ学習することには実用上の問題があります。
 
-```
-predicted = network.forward(state)[2]          // what we predicted for action 2
-target    = 3.0 + 0.99 × max(network.forward(next_state))  // what it should be
-loss      = (predicted - target)²              // how wrong we were
-```
+午後2:15のstateは午後2:30のstateに非常に似ています。午後2:30のstateは午後2:45のstateに似ています。agentが各transitionをリアルタイムで学習すると、ほぼ同一の状況が繰り返される高い相関のあるストリームに基づいてweightsを調整することになります。weightsは直近1時間に特化して調整され、他の状況について学んだことを「忘れて」しまいます。
 
-次にbackpropagationが損失を減らすように重みを調整します。これが`DenseNetwork.train()` — 標準的な勾配降下法です。
-
-数千回の更新を経て、ネットワークのQ-value予測は正確になり、エージェントの方策は改善されます。
-
-## Experience Replay：記憶からの学習
-
-遷移を1つずつ学習することには問題があります：連続する経験は高度に相関しています（午後2:15のstateは午後2:30のstateに非常に似ています）。ニューラルネットワークは相関したデータからの学習が苦手です。
-
-**Experience replay**がこれを解決します。各遷移をすぐに学習するのではなく、エージェントはバッファに格納します：
+**Experience replay**はシンプルなトリックでこれを解決します：すぐに学習するのではなく、各transitionをバッファに保存します：
 
 ```
-buffer = [(state₁, action₁, reward₁, next_state₁),
-          (state₂, action₂, reward₂, next_state₂),
-          ...
-          (state₁₀₀₀₀, ...)]
+buffer = [
+  (state from day 1, action, reward, next_state),
+  (state from day 3, action, reward, next_state),
+  (state from day 1 again, different action, ...),
+  ...
+]
 ```
 
-そして、各学習ステップで、バッファから32の遷移をランダムにサンプリングします。これにより相関が断ち切られます — バッチには1日目、3日目、7日目の遷移が含まれ、異なる予算レベルや異なる時間帯のものが混在する可能性があります。
+そして、各訓練ステップでバッファのどこからでもランダムに32個のtransitionのバッチを取り出します。このバッチには今朝のtransition、3日前のtransition、まったく異なる予算レベルのtransitionが含まれるかもしれません。この多様性がネットワークを広く学習させ、現在の瞬間だけに特化させないようにします。
 
-コード中では、これは`ReplayBuffer` — 容量10,000の循環バッファです。満杯になると、新しい遷移が最も古いものを上書きします。`buffer.sample(32, rng)`がランダムなバッチを返します。
+コード上では、これが`ReplayBuffer`です——最大10,000個のtransitionを保持する循環バッファです。満杯になると、新しいエントリが最も古いものを上書きします。`buffer.sample(32, rng)`がランダムなバッチを取り出します。
 
-## Double DQN：過大推定の修正
+---
 
-標準的なDQNには微妙なバグがあります。ターゲットを計算する際：
+## Double DQN：バイアスの補正
+
+標準的なDQNには微妙な欠陥があります。訓練targetの計算方法を見てみましょう：
 
 ```
 target = reward + γ × max(network.forward(next_state))
 ```
 
-同じネットワークが最良のactionの**選択**（`max`による）と**評価**の両方を行います。これは系統的な過大推定を引き起こします — ネットワークはactionを過大評価する傾向があり、特に予測にノイズが多い学習初期に顕著です。
+`max`操作は次のstateで最も良さそうなactionを選びます。しかし、ネットワークから出てくる推定値にはノイズがあり、特に訓練初期でweightsがほとんど調整されていないときは顕著です。推定値にノイズがある場合、最も高い値は過大推定になりがちです——本当に良いから高いのと、現在のweight設定のランダムなノイズにより高くなっているのが混在するからです。
 
-**Double DQN**は2つのネットワークを維持することでこれを修正します：
+常に`max`を取ることで、agentは系統的にQ-valuesを過大推定します。これによりagentは過信状態になり、訓練が不安定になりえます。広告入札では、積極的な入札が実際よりも有益だとagentが考え——予算の使い果たしにつながります。
 
-- **Q-network**：毎学習ステップで更新。最良のactionを**選択**するために使用。
-- **Target network**：Q-networkの遅延コピー。選択されたactionを**評価**するために使用。
+**Double DQN**は、この作業を2つの別々のネットワークに分割することで修正します：
+
+- **Q-network**：メインのネットワークで、各訓練ステップ後に更新される。
+- **Target network**：Q-networkのコピーで、100ステップごとにのみ更新される。
+
+最善のactionの*選択*と*評価*に同じネットワークを使う代わりに、Double DQNはこれらを分離します：
 
 ```
-best_action = argmax(q_network.forward(next_state))     // Q-net picks
+best_action = argmax(q_network.forward(next_state))   // Q-net selects
 target = reward + γ × target_network.forward(next_state)[best_action]  // target-net evaluates
 ```
 
-Target networkは100学習ステップごとにQ-networkから同期されます（`targetNetwork.copyFrom(qNetwork)`）。この分離により過大推定が減少し、学習がより安定します。
+target networkは安定した参照点です。100ステップごとにしか更新されないため、自分自身を追いかけ回すことがありません。Q-networkは常に変動するターゲットではなく、ゆっくり動くターゲットに対して学習します。
 
-これは`DQNAgent.trainStep()`の83-93行目です。
+これは`DQNAgent.trainStep()`の83〜93行目で実装されています。
 
-## Explorationとexploitation
+---
 
-エージェントが常に最高のQ-valueを持つactionを選択すると、実は別のactionの方が良いことを発見できないかもしれません。平凡な戦略に固定されてしまう可能性があります。
+## Exploration対Exploitation
 
-**Epsilon-greedy** explorationがこれを解決します。確率**ε (epsilon)**で、エージェントは最良のものの代わりにランダムなactionを取ります：
+agentが常に最も高いQ-valueのactionを選ぶと、他のactionがさらに良いかもしれないことを発見できません。凡庸なルーティンに落ち着き、そこから抜け出せなくなる可能性があります。
 
-```scala
+この緊張関係——既知のものを活用するか、新しいものを試すか——は**explore/exploit tradeoff**と呼ばれます。RLにおける根本的な問題の1つです。
+
+Promovolveは**epsilon-greedy**探索でこれを解決します。パラメータε（epsilon）は確率です：
+
+```
 if (rng.nextDouble() < epsilon)
-  rng.nextInt(actionSize)    // explore: random action
+  take a random action    // explore
 else
-  argMax(qNetwork.forward(state))  // exploit: best known action
+  take the best-known action  // exploit
 ```
 
-Epsilonは高い値（1.0 = 完全にランダム）から始まり、時間とともに減衰（学習ステップごとに0.995倍）してフロアの0.05まで下がります。これは以下を意味します：
+epsilonは1.0（完全にランダム）から始まり、各訓練ステップ後に0.995を掛けて減衰し、下限0.05まで下がります。
 
-- **1日目**：ほぼすべてランダム — エージェントは探索中
-- **3-5日目**：主に学習した方策を活用し、まだ15-30%がランダム
-- **8日目以降**：95%が活用、5%が探索 — エージェントは自信を持っているが、時折新しいことを試す
+実際にはこれは次のことを意味します：
 
-この減衰スケジュールにより、エージェントは何も知らないときは積極的に探索し、徐々に学んだことの活用に移行します。
+- **1日目**：ほぼ完全にランダム。agentは何も知らず、生の経験を蓄積している。
+- **3〜5日目**：ほとんど学習済みのポリシーを活用しているが、まだ15〜30%はランダム。agentは有用な知識を持っているが、まだ精錬中。
+- **8日目以降**：95%が活用、5%が探索。agentは学んだことを信頼しているが、現在のポリシーが見落としている機会を捉えるために小さなランダム要素を維持している。
+
+減衰スケジュールは意図的です：無知なときは積極的に探索し、情報を得たら自信を持って活用する。
+
+---
 
 ## すべてをまとめる
 
-以下が各`CampaignEntity`アクター内で実行される完全なサイクルです：
+以下は、各`CampaignEntity`アクター内部で実行される完全なサイクルです。
 
-### 各入札リクエスト（高速パス）
+### 各bid request（高速パス）
+
 ```
 bid_cpm = campaign.max_cpm × agent.bid_multiplier
 ```
-multiplierは単にキャッシュされた数値です。ニューラルネットワークは関与しません。サブマイクロ秒。
 
-### 各インプレッション
+multiplierは単なるキャッシュされた数値です。ここではneural networkの計算は行われません。このパスはサブマイクロ秒です。
+
+### 各impression
+
 ```
 agent.record_impression(cpm)
 agent.record_bid_opportunity(won=true)
 ```
-ウィンドウカウンターをインクリメントします。同様にサブマイクロ秒。
 
-### 各クリック
+ウィンドウカウンターをインクリメントします。これもサブマイクロ秒です。
+
+### 各click
+
 ```
 agent.record_click()
 ```
-ウィンドウクリックカウンターをインクリメントします。
+
+ウィンドウのクリックカウンターをインクリメントします。
 
 ### 15分ごと（低速パス）
+
 ```
 1. Build state vector from window metrics:
    [effective_cpm, ctr, win_rate, budget_remaining,
     time_remaining, spend_rate, impression_rate, cost_per_click]
 
 2. If we have a previous state:
-   a. reward = clicks - overspend_penalty
+   a. Compute pacing-scaled reward
    b. Store (prev_state, prev_action, reward, state, done) in replay buffer
    c. Sample batch of 32 from buffer
-   d. For each sample: compute Double DQN target, train network (SGD)
+   d. For each sample: compute Double DQN target, train network
 
-3. Select action: epsilon-greedy
+3. Select action: epsilon-greedy (one of 7 multiplier adjustments)
 4. Apply: bid_multiplier *= action_adjustment (e.g., 1.1×)
-5. Clamp: bid_multiplier in [0.5, 2.0]
+5. Clamp: bid_multiplier stays in [0.5, 2.0]
 6. Reset window counters
 ```
 
-### 日の終わりに
+### 1日の終わり
+
 ```
-1. Store terminal transition (done=true) if we took any actions
+1. Store terminal transition (done=true)
 2. Reset bid_multiplier to 1.0
-3. Keep all network weights (the learned policy carries over)
+3. Keep all network weights — the learned policy carries over to tomorrow
 ```
 
 ### エンティティ再起動時
+
 ```
 1. Restore network weights from persisted snapshot
-2. Replay buffer is empty (ephemeral) — agent resumes with learned policy
-   but needs to re-accumulate experience for training
+2. Replay buffer is empty — agent resumes with learned policy but needs
+   to re-accumulate experience before it can train again
 ```
 
-## エージェントが学ぶこと
+---
 
-数日にわたり、良好なパフォーマンスを発揮するエージェントは次のようなパターンを学習します：
+## Agentが実際に学習すること
 
-- **1日の序盤で予算が十分ある場合**：積極的に入札する（multiplier > 1.0）ことで質の高いインプレッションを獲得
-- **予算が少なく残り時間がある場合**：引き下げる（multiplier < 1.0）ことで残り予算を延ばす
-- **CTRの高いコンテンツ**：入札を上げる価値がある — クリックがreward
-- **過剰消化**：ペナルティ閾値（1.5倍ペース）に達する前に入札を下げる
-- **1日の終わりに予算が余っている場合**：残り予算を生産的に使うために入札を上げる
+数日間の運用後、十分に訓練されたagentは次のようなパターンを発見します——それらが存在すると教えられることなく：
 
-これらはプログラムされたルールではありません。reward信号と数千の学習ステップから創発するものです。
+- **1日の序盤で予算が満額**：ペースを維持しながらインプレッションを獲得するために穏当に入札する。
+- **時間が残っているのに予算が少ない**：ペーシングスコアがrewardを低下させる前に引き下げる。
+- **クリック率の高いコンテンツ**：入札を上げる価値がある——クリックがrewardであり、良好なペーシングがそれを増幅する。
+- **過剰支出**：ペーシングスコアがすべてのクリックの価値を即座に低下させる——agentは1〜2回の観測で自己修正を学ぶ。
+- **1日の終盤で予算が余っている**：残りの予算を生産的に使うために入札を上げる——過少支出もペーシングスコアを下げる。
 
-## 主要なハイパーパラメータ
+これらはどれもプログラムされていません。rewardシグナルから、数千回の訓練ステップを通じて出現するのです。
 
-| Parameter | Value | What it controls |
-|-----------|-------|-----------------|
-| γ (gamma) | 0.99 | 将来のrewardの重要度（高い = 辛抱強い） |
-| Learning rate | 0.001 | ネットワークの更新速度（高すぎると = 不安定） |
-| ε start | 1.0 | 初期exploration率（完全にランダム） |
-| ε end | 0.05 | 最小exploration（常に5%ランダム） |
-| ε decay | 0.995 | exploreからexploitへの移行速度 |
-| Buffer size | 10,000 | 記憶する経験の量 |
-| Batch size | 32 | 学習ステップあたりの遷移数 |
-| Target sync | 100 steps | Target networkがQ-networkからコピーする頻度 |
-| Hidden layers | [64, 64] | ネットワーク容量（大きい = より複雑な方策） |
-| Q-clip | ±100 | 極端なQ-value推定を防止 |
-| Grad clip | ±5.0 | 学習中の勾配爆発を防止 |
+---
 
-これらはすべて`DQNAgent.Config`と`BidOptimizationAgent.Config`に含まれています。
+## 主要なHyperparameters
+
+これらはすべて`DQNAgent.Config`と`BidOptimizationAgent.Config`にあります。
+
+| Parameter | Value | What it does |
+|---|---|---|
+| γ (gamma) | 0.99 | How much future rewards matter. High = patient. |
+| Learning rate | 0.001 | How aggressively to adjust weights per training step. |
+| ε start | 1.0 | Initial exploration rate (fully random). |
+| ε end | 0.05 | Minimum exploration (always 5% random). |
+| ε decay | 0.995 | How fast to shift from explore to exploit. |
+| Buffer size | 10,000 | How much experience to remember. |
+| Batch size | 32 | Transitions pulled per training step. |
+| Target sync | 100 steps | How often the target network copies the Q-network. |
+| Hidden layers | [64, 64] | Size of intermediate layers in the network. |
+| Actions | 7 | Multipliers: [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.4] |
+| Multiplier range | [0.5, 2.0] | Hard bounds on the cumulative bid multiplier. |
+| Q-clip | ±100 | Prevents extreme Q-value estimates. |
+| Grad clip | ±5.0 | Prevents catastrophically large weight adjustments. |
+
+---
 
 ## 理論からコードへ
 
-これでソースコードを直接読むことができます：
-
 | Concept | File | Key method |
-|---------|------|-----------|
-| Neural network (forward + backprop) | `DenseNetwork.scala` | `forward()`, `train()` |
+|---|---|---|
+| Neural network (forward + training) | `DenseNetwork.scala` | `forward()`, `train()` |
 | Experience replay buffer | `ReplayBuffer.scala` | `store()`, `sample()` |
 | Double DQN + epsilon-greedy | `DQNAgent.scala` | `selectAction()`, `trainStep()` |
-| State/reward/action design | `BidOptimizationAgent.scala` | `toState()`, `computeReward()`, `observe()` |
+| State / reward / action design | `BidOptimizationAgent.scala` | `toState()`, `computeReward()`, `observe()` |
 | Integration with campaign actor | `CampaignEntity.scala` | `RLObserveTick`, `TryReserve` |
 
-次の章では、これらの各コンポーネントを正確な数式と設定値とともに詳細に解説します。
+次の章では、これらの各コンポーネントを正確な数式と設定値とともに詳しく解説します。
