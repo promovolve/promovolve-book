@@ -1,89 +1,71 @@
 # Reward Function
 
-The reward function defines what the DQN agent optimizes for. From `BidOptimizationAgent.scala`:
-
-## Formula
-
-```scala
-reward = clickReward - overspendPenalty
-
-where:
-  clickReward = windowClicks.toDouble
-
-  overspendPenalty = if (spendRate > 1.5)
-                       config.overspendPenalty × (spendRate - 1.5)
-                     else 0.0
-```
-
-**Default penalty factor**: `overspendPenalty = 2.0`
-
-## Component Breakdown
-
-### Clicks (Primary Signal)
-
-Raw number of clicks in the 15-minute observation window. This is the positive signal — the agent maximizes clicks because that's what advertisers care about.
-
-**Why clicks, not impressions?**
-- Impressions don't indicate value — they're "free" from the user's perspective
-- Clicks represent actual engagement
-- Maximizing clicks naturally selects for high-CTR placements
-
-**Why clicks, not revenue?**
-- Revenue (CPM × impressions) would incentivize bidding as high as possible
-- This contradicts the advertiser's interest in efficient spending
-- Clicks align the agent with advertiser ROI
-
-### Overspend Penalty
+The reward function defines what the floor CPM agent optimizes for. From `FloorCpmOptimizationAgent.scala`:
 
 ```
-overspendPenalty = 2.0 × max(0, spendRate - 1.5)
+reward = normalizedRevenue × fillRate
+       − emptyPenalty
+       − budgetExhaustionPenalty
+       − volatilityPenalty
+       − boundaryPenalty
 ```
 
-- **Threshold at 1.5x**: No penalty for spending up to 50% faster than target. Gives the agent freedom to bid aggressively when opportunities are good.
-- **2.0x factor**: Each unit of overspend above 1.5x costs 2.0 reward points
-- **Continuous**: Allows the agent to learn the trade-off rather than hitting a hard wall
+## Revenue × Fill Rate
 
-Examples:
+The primary signal. Revenue is normalized by a baseline (one impression at floor price) so the signal is independent of absolute floor level.
+
+Multiplying by fill rate provides a gradient signal even when revenue is zero. Without it, the agent only sees "zero revenue" when the floor is too high, with no indication of *how bad* it is. Fill rate provides that gradient:
+- Floor slightly too high → fillRate=0.6 → partial reward
+- Floor way too high → fillRate=0.0 → zero reward
+
+## Empty Auction Penalty
+
 ```
-spendRate = 1.0 → penalty = 0      (on pace)
-spendRate = 1.5 → penalty = 0      (at threshold)
-spendRate = 2.0 → penalty = 1.0    (moderate overspend)
-spendRate = 3.0 → penalty = 3.0    (severe overspend)
-```
-
-## Episode Termination
-
-The episode terminates when:
-
-```scala
-done = (budgetRemaining <= 0.0) || (timeRemaining <= 0.0)
+emptyPenalty = weight × max(0, 0.5 − fillRate)
 ```
 
-At termination, a special terminal transition is stored:
+Activates when fill rate drops below 50%. The penalty increases linearly as fill rate drops — a stronger signal than the multiplicative revenue×fillRate term when fill rate is very low.
 
-```scala
-val terminalState = Array.fill(stateSize)(0.0)   // Zero vector
-val terminalReward = windowClicks.toDouble        // Final clicks (no penalty)
-dqn.store(prevState, prevAction, terminalReward, terminalState, done = true)
+## Budget Exhaustion Penalty (weight = 2.0)
+
+```
+budgetExhaustionPenalty = 2.0 × budgetExhaustionRate
 ```
 
-The `done = true` flag tells DQN not to bootstrap future rewards beyond the episode boundary.
+Where `budgetExhaustionRate = budgetDeniedServes / totalServeAttempts`.
 
-## Reward Examples
+This is the most important penalty. A high floor causes solo winners to pay floor price on every impression. Higher floor → higher per-impression cost → faster budget drain → budget exhaustion → zero revenue. The penalty catches this cascade early:
 
-| Window | Clicks | spendRate | Penalty | Reward |
-|--------|--------|-----------|---------|--------|
-| Normal pacing | 3 | 1.0 | 0 | 3.0 |
-| Good CTR | 8 | 1.2 | 0 | 8.0 |
-| Slight overspend | 5 | 1.8 | 0.6 | 4.4 |
-| Severe overspend | 2 | 3.0 | 3.0 | -1.0 |
-| At threshold | 4 | 1.5 | 0 | 4.0 |
+1. Floor rises to $4 (only one $5 bidder remains)
+2. Solo winner pays $4 per thousand impressions (was paying $2 with competition)
+3. Budget drains 2x faster
+4. After a few hours, budget exhausted — all serves denied
+5. Agent sees budgetExhaustionRate spike → penalty fires → agent lowers floor
 
-## Design Simplicity
+Without this penalty, the agent would only learn "high floor = bad" after the budget exhausts and revenue drops to zero — a delayed signal that leads to slow learning.
 
-Note what the reward function **does not** include:
-- No exhaustion penalty — the episode simply ends when budget hits zero
-- No CPA signal — conversion tracking is sparse, clicks are a sufficient proxy
-- No win-rate bonus — win rate is in the state space, letting the agent learn its own trade-offs
+## Volatility Penalty
 
-This simplicity makes the reward signal clean and easy to interpret. The agent learns that clicks are good and overspending is bad — everything else it figures out from the state space.
+```
+volatilityPenalty = 0.3 × |currentFloor − prevFloor| / prevFloor
+```
+
+Discourages wild swings. Advertisers need price stability — if the floor jumps 20% every 15 minutes, they can't plan budgets. The penalty is proportional to the relative change, so a $0.10 change at a $5 floor (2%) is penalized less than a $0.10 change at a $0.50 floor (20%).
+
+## Boundary Penalty
+
+```
+boundaryPenalty = 0.1 if floor is within 5% of min or max limit (and ε < 0.3)
+```
+
+A soft nudge away from the boundaries. Only active during exploitation (ε < 0.3) — during exploration, boundary hits are expected and shouldn't be penalized.
+
+## Design Principle
+
+The reward function is intentionally simple. Complex reward functions with many terms are hard to debug and can create unexpected local optima. Each term has a clear purpose:
+
+- Revenue × fillRate: "maximize publisher income"
+- Empty penalty: "don't let auctions go unfilled"
+- Budget penalty: "don't drain advertiser budgets"
+- Volatility penalty: "be stable"
+- Boundary penalty: "don't get stuck at limits"

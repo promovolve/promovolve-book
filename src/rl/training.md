@@ -1,132 +1,83 @@
 # Training Loop & Hyperparameters
 
-## Hyperparameters (from DQNAgent.scala and BidOptimizationAgent.scala)
+## Hyperparameters (from FloorCpmOptimizationAgent)
 
-| Parameter | Default | Source |
-|-----------|---------|--------|
-| Hidden layers | `[64, 64]` | DQNAgent.Config |
-| Learning rate | 0.001 | DQNAgent.Config |
-| Gamma (discount) | 0.99 | DQNAgent.Config |
-| Replay buffer size | 10,000 | DQNAgent.Config |
-| Batch size | 32 | DQNAgent.Config |
-| Min buffer size | 100 | DQNAgent.Config (before first training step) |
-| Target sync interval | 100 steps | DQNAgent.Config |
-| Epsilon start | 1.0 | DQNAgent.Config |
-| Epsilon end | 0.05 | DQNAgent.Config |
-| Epsilon decay | 0.995 | DQNAgent.Config |
-| Q-value clip | [-100, 100] | DQNAgent.Config |
-| Observation interval | 15 minutes | `promovolve.rl.observe-interval` |
-| Day duration | 86400s | `promovolve.rl.day-duration-seconds` |
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| stateSize | 7 | Floor-related metrics |
+| actionSize | 7 | Floor adjustment multipliers |
+| hiddenSizes | [64, 32] | Smaller than typical — simple problem |
+| γ (gamma) | 0.95 | Discount factor — floor effects are fairly immediate |
+| learningRate | 0.0005 | Conservative — floor changes are high-impact |
+| εStart | 0.8 | Initial exploration rate |
+| εEnd | 0.05 | Minimum exploration |
+| εDecay | 0.995 | Multiplicative decay per training step |
+| bufferSize | 5,000 | Replay buffer capacity |
+| minBufferSize | 4 | Start training after 4 transitions |
+| batchSize | 4 | Mini-batch size |
+| targetSyncInterval | 50 | Sync target network every 50 steps |
+| qClip | 50.0 | Clip Q-value targets |
+| maxFloorFraction | 0.80 | Never exceed 80% of highest observed CPM |
+| bidSpreadThreshold | 1.5 | Only train when max/min bid ratio > 1.5x |
 
-## Training Schedule
+## Training Cycle
 
-Every 15 minutes (96 times per real day):
-
-```
-┌───────────────────────────────┐
-│ 1. Timer fires in Campaign    │  rlObserveInterval = 15 min
-│ 2. Compute timeRemaining      │  1.0 - elapsed / dayDuration
-│ 3. Build observation          │  windowImps, clicks, spend, etc.
-│ 4. Call bidOptAgent.observe()  │
-│    a. Build 8-dim state        │
-│    b. Compute reward           │  clicks - overspendPenalty
-│    c. Store (s,a,r,s',done)    │  → replay buffer
-│    d. ε-greedy action select   │  random if ε, else argmax Q(s)
-│    e. Apply action             │  bidMultiplier *= adjustment
-│    f. Sample batch (32)        │  from replay buffer
-│    g. Compute Double DQN loss  │
-│    h. Backprop + weight update │
-│    i. Maybe sync target net    │  every 100 train steps
-│ 5. Reset window counters      │
-└───────────────────────────────┘
-```
-
-## Epsilon-Greedy Exploration
-
-```scala
-if (rng.nextDouble() < epsilon):
-    action = rng.nextInt(actionSize)       // random exploration
-else:
-    action = argmax(qNetwork.forward(state))  // exploitation
-```
-
-Epsilon decays after each training step:
-
-```scala
-epsilon = max(epsilonEnd, epsilon × epsilonDecay)
-```
-
-### Decay Timeline (96 steps/day)
+Every 15 minutes (or scaled shorter for simulated days):
 
 ```
-Day 1:   ε ≈ 1.00  → 100% random (pure exploration)
-Day 2:   ε ≈ 0.62  → 62% random
-Day 3:   ε ≈ 0.38  → 38% random
-Day 5:   ε ≈ 0.15  → 15% random
-Day 8:   ε ≈ 0.05  → 5% random (hits floor)
-Day 8+:  ε = 0.05  → 5% random (steady-state)
+1. Check activation gate:
+   - No auctions in window? → skip
+   - No bid spread and no floor rejections? → skip (homogeneous market)
+
+2. Encode state (7 dimensions from window metrics)
+
+3. Compute reward from previous action's outcome
+
+4. Store transition: (prevState, prevAction, reward, newState)
+
+5. Sample mini-batch of 4 from replay buffer
+
+6. Train Q-network:
+   - For each transition: target = reward + γ × Q_target(s', argmax Q_online(s'))
+   - MSE loss, backprop through 2-layer network
+   - Gradient clipping at ±5.0
+
+7. Every 50 steps: sync target network from Q-network
+
+8. Select next action (ε-greedy)
+
+9. Apply action: multiply floor by selected multiplier
+
+10. Clamp to [publisherMinFloor, maxObservedCPM × 0.80]
+
+11. Persist DQN snapshot in SiteEntity state
+
+12. Send UpdateFloorCpm to AuctioneerEntity
+
+13. Publish new floor via DData (PacingConfig)
 ```
 
-The 5% floor ensures ongoing exploration to adapt to changing conditions.
+## Convergence Timeline
 
-## Replay Buffer (ReplayBuffer.scala)
+With 4 observations per hour (15-minute intervals):
 
-### Structure
-```scala
-private val states: Array[Array[Double]]
-private val actions: Array[Int]
-private val rewards: Array[Double]
-private val nextStates: Array[Array[Double]]
-private val dones: Array[Boolean]
-```
+| Phase | ε | Observations | Behavior |
+|-------|---|-------------|----------|
+| Early | 0.8 | 0–50 | Mostly random floor changes, filling replay buffer |
+| Mid | 0.5 | 50–150 | Learning kicks in, floor starts trending toward optimal |
+| Late | 0.1 | 300+ | Mostly exploiting, fine-tuning around optimal floor |
 
-### Mechanics
-- **Capacity**: 10,000 transitions (~104 days at 96 steps/day)
-- **Circular buffer**: `writeIdx = (writeIdx + 1) % capacity`
-- **Sampling**: Uniform random (`indices.map(rng.nextInt(currentSize))`)
-- **Min size**: Training starts only after 100 transitions are stored
-- **No prioritization**: All transitions are equally likely to be sampled
+In real time, ε decays from 0.8 to 0.05 over roughly 2–3 weeks. The agent keeps adapting after that — if the market shifts (new campaigns enter, budgets change), it adjusts.
 
-### Why Uniform?
-- State space is small (8-D) — network learns quickly from uniform samples
-- Prioritized Experience Replay adds complexity (sum trees, importance sampling) for marginal benefit
-- 15-minute windows already provide stable, low-noise transitions
+## Why DQN?
 
-## Terminal Transitions
+DQN is arguably overkill for a 7-state, 7-action problem. A simpler approach (hill climbing, bandit) might work nearly as well. The DQN was chosen because:
 
-At day rollover:
+1. The infrastructure was already built for the (now-removed) campaign bid optimization
+2. It handles non-stationary environments (the market changes over time)
+3. The computational cost is negligible (one forward pass every 15 minutes)
+4. The replay buffer provides sample efficiency — the agent can learn from past experiences even as the market changes
 
-```scala
-if prevState exists:
-    terminalState = Array.fill(stateSize)(0.0)  // zero vector
-    terminalReward = windowClicks.toDouble
-    dqn.store(prevState, prevAction, terminalReward, terminalState, done = true)
-```
+## Persistence
 
-The `done = true` flag prevents Q-value bootstrapping across day boundaries:
-
-```scala
-if done:
-    target = reward                          // no future rewards
-else:
-    target = reward + γ × Q(s', argmax Q(s'; θ); θ⁻)  // Double DQN
-```
-
-## Convergence Characteristics
-
-- **Days 1-3**: Mostly random (ε > 0.38), building replay buffer, Q-network starts distinguishing good/bad actions
-- **Days 4-7**: Agent develops basic policy (bid up when budget ample, down when overspending)
-- **Day 8+**: ε hits floor (0.05), policy stabilizes with 5% ongoing exploration
-- **Cross-day**: Weights persist, but multiplier resets to 1.0 daily — the agent re-learns optimal trajectory each day using its accumulated Q-network knowledge
-
-## Monitoring
-
-```scala
-// Q-values for inspection
-def qValues(state: Array[Double]): Array[Double] = qNetwork.forward(state)
-
-// Day statistics
-DayStats(impressions, clicks, spend, observations, totalReward)
-```
-
-Available via `DQNAgent.Snapshot`: epsilon, totalSteps, trainSteps, network weights.
+The DQN weights (Q-network + target network), epsilon, and step counts are serialized as a `DQNAgent.Snapshot` and stored in `SiteEntity.State.floorAgentSnapshot`. This survives server restarts — the agent picks up where it left off without retraining.
