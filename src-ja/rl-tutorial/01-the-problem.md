@@ -50,7 +50,7 @@
 
 15分ごとにキャンペーンの状況を確認するシステムがあったらどうでしょう --- 支出のペース、クリックが得られているか、勝率はどうか --- そして入札額を調整するのです。固定ルールに従うのではなく、蓄積された経験が示す、その日の残りで最良の結果につながる調整を選択するのです。
 
-それがまさにPromovolveの`BidOptimizationAgent`が行っていることです。
+それがまさにPromovolveの`FloorCpmOptimizationAgent`が行っていることです。
 
 ## 2つの速度: fast pathとslow path
 
@@ -62,7 +62,7 @@ CampaignEntity (fast path, per-request):
   - Budget reservation (TryReserve)
   - Bid response: maxCpm * bidMultiplier
 
-BidOptimizationAgent (slow path, every 15 minutes):
+FloorCpmOptimizationAgent (slow path, every 15 minutes):
   - Observes: spend, clicks, impressions, win rate, time/budget remaining
   - Outputs: new bidMultiplier
   - Trains DQN on accumulated experience
@@ -70,7 +70,7 @@ BidOptimizationAgent (slow path, every 15 minutes):
 
 **CampaignEntity**はすべての受信広告リクエストを処理します。fast path上で動作します --- シンプルな算術で、MLは関与しません。各リクエストに対して、キャンペーンが入札資格があるかを確認し、予算を確保し、入札価格で応答します。その入札価格は単に`maxCpm * bidMultiplier`です。
 
-**BidOptimizationAgent**はslow path上で動作します。15分ごとに起動し、最後のウィンドウのキャンペーンパフォーマンスメトリクスを確認し、`bidMultiplier`をどのように調整するかを決定します。また、この経験を使ってneural networkをトレーニングし、将来の意思決定を改善します。
+**FloorCpmOptimizationAgent**はslow path上で動作します。15分ごとに起動し、最後のウィンドウのキャンペーンパフォーマンスメトリクスを確認し、`bidMultiplier`をどのように調整するかを決定します。また、この経験を使ってneural networkをトレーニングし、将来の意思決定を改善します。
 
 この分離は重要です。fast pathは軽量で決定論的です --- 2つの数値を掛けるだけです。すべての学習と適応は、15分間隔でオフラインで行われます。
 

@@ -227,7 +227,7 @@ if (done) {
 
 `gamma * nextQTarget(bestNextAction)`の項はありません。Q-valueは即時のrewardそのものです。これは直感的に理解できます: キャンペーンに予算が残っていなければ、将来のstateに対するQ-valueの予測は関係ありません。将来のstateは存在しないのです。
 
-`BidOptimizationAgent`では、`done`フラグは次の条件で設定されます:
+`FloorCpmOptimizationAgent`では、`done`フラグは次の条件で設定されます:
 
 ```scala
 val done = obs.budgetRemaining <= 0 || obs.timeRemaining <= 0

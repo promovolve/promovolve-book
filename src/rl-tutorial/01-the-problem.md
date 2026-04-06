@@ -1,96 +1,95 @@
-# The Problem: Why Bid Optimization Needs RL
+# The Problem: Why Floor Price Optimization Needs RL
 
-Imagine you are running an online ad campaign. You have a daily budget of $100, a maximum CPM (cost per thousand impressions) of $5, and a full day to spend that budget wisely. Your goal is simple: get as many clicks as possible without blowing through the money too early or leaving it unspent at the end of the day.
+Imagine you run a popular blog about travel in Japan. Advertisers want to show their ads on your site. You need to set a **floor price** — the minimum bid an advertiser must offer to compete for your ad slots. Set it right, and you maximize your revenue. Set it wrong, and you either leave money on the table or drive away advertisers.
 
 How hard can it be?
 
-## The naive approach: bid the same amount all day
+## The naive approach: pick a number and leave it
 
-The simplest strategy is to bid the same amount on every auction throughout the day. Set your CPM to, say, $3 and let it ride.
+The simplest strategy is to set a fixed floor — say, $1.00 CPM — and never change it.
 
-The problem is that web traffic is not uniform. At 10am, when office workers are browsing news sites, traffic surges. There are more impressions available but also more competing advertisers, which drives up prices. Your $3 bid might win almost nothing during this peak because others are bidding $4 or $5.
+The problem is that your advertiser market is not static. This week, five travel companies are bidding between $3 and $10 for your inventory. Your $1.00 floor is doing nothing — everyone clears it easily. You're selling premium travel content for pennies above the floor when the market would support $3+.
 
-Then at 3am, the audience shrinks but so does the competition. Cheap inventory is available at $1 CPM, but you are still bidding $3 --- overpaying for impressions you could have won for less.
+Next month, two of those advertisers pause their campaigns. Now you have three bidders between $2 and $5. Your floor is still fine — but if you'd set it at $4 based on last week's market, you'd be rejecting 2 out of 3 advertisers and halving your fill rate.
 
-A flat bidding strategy fails because the market is not flat.
+A static floor fails because the market is not static.
 
-## The rule-based approach: manually adjust throughout the day
+## The rule-based approach: manually adjust based on metrics
 
 You could try writing rules:
 
-- "If we've spent more than half the budget before noon, reduce the bid by 20%."
-- "If traffic is low and we're under-spending, increase the bid by 10%."
+- "If fill rate drops below 50%, lower the floor by 10%."
+- "If all bids are more than 3x the floor, raise it."
 
-This works better than the naive approach, but you quickly run into problems:
+This works better than a static floor, but you quickly run into problems:
 
-1. **The thresholds are arbitrary.** Why 20% and not 15%? Why noon and not 1pm? You picked these numbers by intuition, and different campaigns will need different ones.
+1. **The thresholds are arbitrary.** Why 50% fill rate? Why 3x? Different sites with different advertiser mixes will need different numbers.
 
-2. **The market changes.** A new competitor launches a campaign on Tuesday that was not there on Monday. Your carefully tuned rules are now wrong.
+2. **The market changes.** A big brand launches a campaign on Tuesday that wasn't there on Monday. Your rules are now leaving money on the table.
 
-3. **Interactions are complex.** Raising your bid affects your win rate, which affects your spend rate, which triggers your spend-pacing rule, which lowers your bid, which drops your win rate. Rule-based systems tend to oscillate or get stuck.
+3. **Interactions are complex.** Raising the floor rejects some bidders, which changes the competitive dynamics among remaining bidders, which changes clearing prices, which changes revenue. Rules that handle one dimension well often fail when multiple dimensions interact.
 
-4. **There are too many variables.** Budget remaining, time remaining, current win rate, click-through rate, cost per click, impression volume --- these all interact in non-obvious ways. Writing rules that handle every combination correctly is a combinatorial nightmare.
+4. **Budget effects are delayed.** A high floor causes advertisers to spend their budgets faster (solo winners pay floor price). This doesn't show up immediately — the effect cascades over hours. Rules can't anticipate this.
 
 ## The environment is non-stationary
 
-This is the deeper issue. The advertising marketplace is not a static puzzle you solve once. It is a living system:
+This is the deeper issue. The advertiser marketplace is a living system:
 
-- **Traffic patterns shift.** A viral news story drives a spike of readers to a publisher site. A holiday changes user behavior.
-- **Competitors enter and leave.** Another advertiser launches a campaign targeting the same audience, driving prices up. An hour later, they exhaust their budget and disappear, and prices drop.
-- **Content changes.** The topics on a publisher's site affect what ads perform well. A sports article attracts different clicks than a finance article.
-- **Your own actions change the environment.** If you bid more aggressively, you win more auctions, which depletes your budget faster, which means you need to bid less aggressively later.
+- **Campaigns start and stop.** New advertisers enter, existing ones exhaust budgets or pause.
+- **Bids change.** An advertiser raises their CPM after seeing good CTR on your site.
+- **Content changes.** Different articles attract different ad categories. A sports article has different bidders than a food article.
+- **Your own actions change the environment.** If you raise the floor and reject a bidder, the remaining bidders face less competition — their clearing prices drop, even though your floor went up.
 
-No static set of rules can keep up. What you need is a system that *adapts* --- one that observes its own performance and adjusts its strategy continuously.
+No static set of rules can keep up. What you need is a system that *adapts* — one that observes the results of its pricing decisions and adjusts continuously.
 
 ## The key insight: learn from experience
 
 Here is the core idea behind using reinforcement learning for this problem:
 
-> The agent does not know the optimal bidding strategy in advance. It must learn from experience by observing the results of its own actions.
+> The agent does not know the optimal floor price in advance. It must learn from experience by observing the results of its own actions.
 
-What if we had a system that, every 15 minutes, looked at how the campaign is doing --- how fast it is spending, whether it is getting clicks, what the win rate looks like --- and then adjusted the bid amount? Not by following a fixed rule, but by choosing the adjustment that its accumulated experience suggests will lead to the best outcome over the rest of the day?
+What if we had a system that, every 15 minutes, looked at how the site is performing — what's the fill rate, how much revenue came in, are budgets draining too fast — and then adjusted the floor price? Not by following a fixed rule, but by choosing the adjustment that its accumulated experience suggests will maximize revenue?
 
-That is exactly what Promovolve's `BidOptimizationAgent` does.
+That is exactly what Promovolve's `FloorCpmOptimizationAgent` does.
 
-## Two speeds: fast path and slow path
+## Two speeds: auction and optimization
 
-A real-time bidding system has to respond to ad requests in milliseconds. You cannot run a neural network inference for every single bid. Instead, Promovolve splits the work into two layers:
+A real-time ad serving system has to respond to requests in milliseconds. You cannot run a neural network for every serve request. Instead, Promovolve splits the work:
 
 ```
-CampaignEntity (fast path, per-request):
-  - Eligibility checks (canBid)
-  - Budget reservation (TryReserve)
-  - Bid response: maxCpm * bidMultiplier
+AuctioneerEntity (fast path, per-auction):
+  - Uses current floor to filter bids
+  - Runs auction with qualifying bidders
+  - Caches results for serve-time
 
-BidOptimizationAgent (slow path, every 15 minutes):
-  - Observes: spend, clicks, impressions, win rate, time/budget remaining
-  - Outputs: new bidMultiplier
+FloorCpmOptimizationAgent (slow path, every 15 minutes):
+  - Observes: fill rate, revenue, bidder count, budget exhaustion
+  - Outputs: new floor CPM
   - Trains DQN on accumulated experience
 ```
 
-The **CampaignEntity** handles every incoming ad request. It runs on the fast path --- simple arithmetic, no ML involved. For each request, it checks whether the campaign is eligible to bid, reserves budget, and responds with a bid price. That bid price is just `maxCpm * bidMultiplier`.
+The **AuctioneerEntity** uses the floor as a simple filter — any bid below the floor is rejected. This is fast and deterministic.
 
-The **BidOptimizationAgent** runs on the slow path. Every 15 minutes, it wakes up, looks at the campaign's performance metrics from the last window, and decides how to adjust the `bidMultiplier`. It also uses this experience to train a neural network so that future decisions improve.
+The **FloorCpmOptimizationAgent** runs on the slow path. Every 15 minutes, it wakes up, looks at the site's auction metrics from the last window, and decides how to adjust the floor. It also uses this experience to train a neural network so that future decisions improve.
 
-This separation is critical. The fast path is lightweight and deterministic --- it just multiplies two numbers. All the learning and adaptation happens offline, on a 15-minute cadence.
+## The floor adjustment: small, safe steps
 
-## The bidMultiplier: one number to rule them all
+The RL agent's output is remarkably simple: a multiplier applied to the current floor price.
 
-The RL agent's output is remarkably simple: a single number called the **bidMultiplier**.
-
-The campaign already has a `maxCpm` set by the advertiser (say, $5). The bidMultiplier scales that value:
-
-| bidMultiplier | Effective CPM | Meaning |
+| Multiplier | Effect | Meaning |
 |:---:|:---:|:---|
-| 0.5 | $2.50 | Bid conservatively --- save budget for later |
-| 1.0 | $5.00 | Bid at the full max --- default starting point |
-| 1.4 | $7.00 | Bid aggressively --- win auctions now |
-| 2.0 | $10.00 | Maximum aggression --- ceiling |
+| 0.90 | Floor drops 10% | Let more bidders in — fill rate was too low |
+| 1.00 | Floor stays the same | Current level is working |
+| 1.10 | Floor rises 10% | Filter out low bidders — market can support more |
 
-The multiplier is clamped between 0.5 and 2.0. This means the agent can never bid more than double or less than half the advertiser's max CPM. These guardrails keep the agent from doing anything catastrophic.
+The adjustment is capped at ±10% per observation. This means the agent can never make drastic changes. It takes multiple observations to make a large move, giving the agent time to see the effect of each step.
 
-Why a multiplier instead of an absolute bid amount? Because different campaigns have different base CPMs. A multiplier of 0.8 means "bid 20% less than the max" regardless of whether the max is $2 or $20. The agent learns a *strategy* (when to be aggressive, when to conserve) that transfers across campaigns.
+The floor is also clamped:
+- **Never below** the publisher's minimum (set in the dashboard)
+- **Never above** 80% of the highest observed bid (always keeps at least one bidder competitive)
+
+These guardrails keep the agent from doing anything catastrophic.
 
 ## What is ahead
 
-In the next chapter, we will formalize this setup using the language of reinforcement learning: states, actions, rewards, and episodes. You will see exactly how Promovolve encodes the campaign's situation into numbers the agent can reason about, and how the reward function encourages the behavior we want --- maximizing clicks while pacing the budget smoothly through the day.
+In the next chapter, we will formalize this setup using the language of reinforcement learning: states, actions, rewards, and episodes. You will see exactly how Promovolve encodes the site's market situation into numbers the agent can reason about, and how the reward function encourages the behavior we want — maximizing publisher revenue while maintaining healthy fill rates and sustainable advertiser budgets.

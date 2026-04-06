@@ -13,7 +13,7 @@ Neural networkをプログラム可能な数式と考えてください。片側
 Promovolveの場合:
 
 - **入力**: キャンペーンの現在のstateを記述する8個の数値（effective CPM、CTR、勝率、残り予算、残り時間、支出レート、impression rate、cost per click）
-- **出力**: 7個の数値、可能なactionごとに1つ（各actionはbid multiplierを調整: 0.7x、0.8x、0.9x、1.0x、1.1x、1.2x、1.4x）
+- **出力**: 7個の数値、可能なactionごとに1つ（各actionはfloor priceを調整: 0.7x、0.8x、0.9x、1.0x、1.1x、1.2x、1.4x）
 
 各actionの出力数値は、そのactionに対するネットワークのQ-value推定値です。Agentは最も高いQ-valueを持つactionを選びます。
 

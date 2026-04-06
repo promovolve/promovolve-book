@@ -2,7 +2,7 @@
 
 In Chapter 2, we explored how an agent learns Q-values -- estimates of how good each action is in a given state. We stored those Q-values in a table, one entry per state-action pair. That works when the world is small and discrete: a grid with a handful of squares, a game with a few dozen positions.
 
-But Promovolve's bid optimization agent lives in a continuous world. Its state is a vector of 8 floating-point numbers -- CTR, win rate, budget remaining, spend rate, and more. Each of those can take on essentially infinite values. There is no table large enough to hold a Q-value for every possible combination of those 8 numbers.
+But Promovolve's floor CPM agent lives in a continuous world. Its state is a vector of 8 floating-point numbers -- CTR, win rate, budget remaining, spend rate, and more. Each of those can take on essentially infinite values. There is no table large enough to hold a Q-value for every possible combination of those 8 numbers.
 
 We need a function that can take *any* 8-number state as input and produce a Q-value for each possible action. That function is a neural network.
 
@@ -13,7 +13,7 @@ Think of a neural network as a programmable formula. You feed in numbers on one 
 In Promovolve's case:
 
 - **Input**: 8 numbers describing the campaign's current state (effective CPM, CTR, win rate, budget remaining, time remaining, spend rate, impression rate, cost per click)
-- **Output**: 7 numbers, one per possible action (each action adjusts the bid multiplier: 0.7x, 0.8x, 0.9x, 1.0x, 1.1x, 1.2x, 1.4x)
+- **Output**: 7 numbers, one per possible action (each action adjusts the floor price: 0.7x, 0.8x, 0.9x, 1.0x, 1.1x, 1.2x, 1.4x)
 
 The output number for each action is the network's estimate of the Q-value for that action. The agent picks the action with the highest Q-value.
 

@@ -17,285 +17,183 @@ graph LR
 
 The agent's goal is to choose actions that maximize the total reward it accumulates over time. Not just the immediate reward --- the *cumulative* reward, including what it expects to earn in the future.
 
-That is it. That is the entire framework. Let us now map each piece to the ad bidding problem.
+That is it. That is the entire framework. Let us now map each piece to the floor price optimization problem.
 
-## Agent: BidOptimizationAgent
+## Agent: FloorCpmOptimizationAgent
 
-In Promovolve, each campaign gets its own `BidOptimizationAgent`. This is the agent. It wakes up every 15 minutes, looks at how the campaign has been performing, and decides whether to increase, decrease, or hold the bid multiplier.
+In Promovolve, each publisher site gets its own `FloorCpmOptimizationAgent`. This is the agent. It wakes up every 15 minutes, looks at how the site's ad inventory has been performing, and decides whether to increase, decrease, or hold the floor price.
 
-The agent does not see individual ad requests. It does not know which users clicked or which publishers served the ads. It sees only aggregate metrics from the last 15-minute window: total impressions, total clicks, total spend, win rate. This is deliberate --- the agent operates on a coarse time scale, making strategic decisions, not tactical ones.
+The agent does not see individual ad requests. It does not know which users saw which ads. It sees only aggregate metrics from the last 15-minute window: fill rate, average winning CPM, served revenue, bidder count, budget exhaustion rate. This is deliberate --- the agent operates on a coarse time scale, making strategic pricing decisions, not tactical ones.
 
-## Environment: the ad marketplace
+## Environment: the advertiser marketplace
 
-The environment is everything *outside* the agent's control: other advertisers' bids, publisher traffic volume, user behavior, time of day. The agent cannot observe the environment directly; it only sees the environment's *effects* through the metrics it receives.
+The environment is everything *outside* the agent's control: how many advertisers are bidding, their CPM levels, their budgets, user traffic patterns, creative quality. The agent cannot observe the environment directly; it only sees the environment's *effects* through the metrics it receives.
 
-This is a crucial distinction. The agent does not know that a competitor just increased their bid by 30%. What it *does* know is that its win rate dropped from 0.6 to 0.3 in the last window. It must figure out the right response from that indirect signal.
+This is a crucial distinction. The agent does not know that a new advertiser just entered the market bidding $10. What it *does* know is that the average winning CPM jumped from $3 to $5 in the last window. It must figure out the right response from that indirect signal.
 
 ## State: what the agent observes
 
-Every 15 minutes, the agent constructs an 8-dimensional state vector from the campaign's current metrics. Each dimension is a number, typically normalized to a range around 0 to 2. Here is the `toState()` method from `BidOptimizationAgent.scala`:
+Every 15 minutes, the agent constructs a 7-dimensional state vector from the site's current metrics. Each dimension is a number, normalized to a range around 0 to 2. Here is the `toState()` method from `FloorCpmOptimizationAgent.scala`:
 
 ```scala
-private def toState(obs: Observation): Array[Double] = {
-  val maxCpm = if (obs.maxCpm > 0) obs.maxCpm else 1.0
-  val dailyBudget = if (obs.dailyBudget > 0) obs.dailyBudget else 1.0
+private def toState(): Array[Double] = {
+  val maxCpm = if (windowMaxCpm > 0) windowMaxCpm else 1.0
+  val fillRate = if (windowAuctions > 0) windowFilled.toDouble / windowAuctions else 0.0
+  val avgWinCpm = if (windowFilled > 0) windowTotalWinCpm / windowFilled else 0.0
+  val avgBidders = if (windowAuctions > 0) windowTotalBidders.toDouble / windowAuctions else 0.0
+  val servedRevPerAuction = if (windowAuctions > 0) windowServedRevenue / windowAuctions else 0.0
+  val rejRate = if (windowTotalBids > 0) windowRejections.toDouble / windowTotalBids else 0.0
+  val totalServeAttempts = windowServedImpressions + windowBudgetExhausted
+  val budgetExhaustionRate = if (totalServeAttempts > 0) windowBudgetExhausted.toDouble / totalServeAttempts else 0.0
 
   Array(
-    // 0: effective CPM (normalized)
-    math.min(2.0, (obs.maxCpm * _bidMultiplier) / maxCpm),
-    // 1: CTR in window
-    if (windowImpressions > 0) math.min(1.0, windowClicks.toDouble / windowImpressions)
-    else 0.0,
-    // 2: win rate
-    if (windowBidOpportunities > 0) windowWins.toDouble / windowBidOpportunities
-    else 0.5,
-    // 3: budget remaining fraction
-    math.max(0.0, math.min(1.0, obs.budgetRemaining / dailyBudget)),
-    // 4: time remaining fraction
-    math.max(0.0, math.min(1.0, obs.timeRemaining)),
-    // 5: spend rate vs ideal (1.0 = on pace)
-    spendRate(obs),
-    // 6: impression rate (normalized by expected)
-    normalizedImpressionRate(obs),
-    // 7: CPC (normalized)
-    if (windowClicks > 0) math.min(2.0, (windowSpend / windowClicks) / maxCpm)
-    else 0.0
+    math.min(2.0, if (maxCpm > 0) _currentFloor / maxCpm else 0.5),
+    fillRate,
+    math.min(5.0, if (_currentFloor > 0) avgWinCpm / _currentFloor else 1.0),
+    math.min(2.0, avgBidders / 10.0),
+    math.min(3.0, if (_currentFloor > 0) servedRevPerAuction / (_currentFloor / 1000.0) else 0.0),
+    rejRate,
+    budgetExhaustionRate
   )
 }
 ```
 
 Let us walk through each dimension and why it matters.
 
-### Dimension 0: effectiveCpm
+### Dimension 0: currentFloor / maxObservedCPM
 
-This is the agent's current bid level --- `maxCpm * bidMultiplier`, normalized by `maxCpm` so it always sits around 1.0. This tells the agent "where is my bid right now?" If the multiplier is 1.0, this value is 1.0. If the multiplier is 0.7, this is 0.7.
+Where is the floor relative to the market? If the floor is $3 and the highest bid is $10, this is 0.3 — plenty of room. If the floor is $8 and the highest bid is $10, this is 0.8 — dangerously close to pricing everyone out.
 
-**Why it matters:** The agent needs to know its own current bid to reason about whether to raise or lower it. Without this, it would have no memory of its previous decisions.
+**Why it matters:** The agent needs to know its own position to reason about whether to move up or down.
 
-### Dimension 1: ctr (click-through rate)
+### Dimension 1: fillRate
 
-The ratio of clicks to impressions in the last 15-minute window. If the campaign served 200 impressions and got 4 clicks, CTR is 0.02.
+The fraction of auctions that produced a winner. If 100 auctions ran and 80 had at least one qualifying bidder, fill rate is 0.8.
 
-**Why it matters:** CTR is the direct signal of ad quality. If CTR is high, the current bid level is winning good inventory. If CTR drops, the agent might be winning low-quality impressions (cheap but unclicked) or the audience mix has changed.
+**Why it matters:** Fill rate is the most direct signal of whether the floor is too high. A dropping fill rate means the floor is rejecting too many bidders.
 
-### Dimension 2: winRate
+### Dimension 2: avgWinningCPM / currentFloor
 
-The fraction of bid opportunities that resulted in a win. If the campaign bid on 500 auctions and won 300, win rate is 0.6.
+How far above the floor are winners bidding? If the floor is $2 and the average winning CPM is $6, this ratio is 3.0 — winners are bidding well above the floor, which means the floor could probably be higher.
 
-**Why it matters:** Win rate tells the agent how competitive it is. A low win rate (say 0.1) means the agent is being outbid most of the time --- it might need to increase the multiplier. A very high win rate (say 0.95) might mean the agent is overbidding --- it could lower the multiplier and save budget while still winning plenty of auctions.
+**Why it matters:** A high ratio suggests the floor is leaving money on the table. A ratio near 1.0 means winners are barely clearing the floor — the floor might be too high.
 
-### Dimension 3: budgetRemaining
+### Dimension 3: avgBidderCount
 
-The fraction of the daily budget that has not yet been spent. Starts at 1.0, drops toward 0.0.
+The average number of bidders per auction, normalized by 10. Three bidders gives 0.3; ten bidders gives 1.0.
 
-**Why it matters:** This is the scarcity signal. If it is 2pm and the budget is already at 0.2, the agent needs to conserve. If it is 2pm and the budget is at 0.8, the agent can afford to be more aggressive.
+**Why it matters:** More bidders means more competition, which naturally drives up clearing prices. The agent can learn that in high-competition environments, it can raise the floor without losing fill rate.
 
-### Dimension 4: timeRemaining
+### Dimension 4: servedRevenue (normalized)
 
-The fraction of the delivery period remaining. Starts at 1.0 at the beginning of the day, drops to 0.0 at the end.
+The actual revenue per auction from served impressions, normalized by the floor price. This is the ground truth signal — what the publisher actually earned, not what the auction promised.
 
-**Why it matters:** Time context is critical. Having 50% of the budget left means very different things depending on whether 50% or 10% of the day remains. The agent needs both dimensions to reason about pacing.
+**Why it matters:** This is the number the agent is ultimately trying to maximize. Using served revenue (not auction-time clearing prices) accounts for pacing throttle — if impressions never actually serve, they don't count.
 
-### Dimension 5: spendRate
+### Dimension 5: rejectionRate
 
-The ratio of actual spending pace to the ideal even pace. A value of 1.0 means the campaign is spending exactly on track. A value of 2.0 means it is spending twice as fast as it should. A value of 0.5 means it is under-spending.
+The fraction of bids rejected because the campaign's CPM is below the floor.
 
-This is computed by comparing how much has been spent to how much *should* have been spent given the elapsed time:
+**Why it matters:** This tells the agent exactly how many advertisers the floor is blocking. A high rejection rate with low fill rate means the floor is too aggressive.
 
-```scala
-private def spendRate(obs: Observation): Double = {
-  if (obs.dailyBudget <= 0 || obs.timeRemaining >= 1.0) return 1.0
-  val elapsed = 1.0 - obs.timeRemaining
-  if (elapsed <= 0) return 1.0
-  val expectedSpend = obs.dailyBudget * elapsed
-  if (expectedSpend <= 0) return 1.0
-  val actualSpend = obs.dailyBudget - obs.budgetRemaining
-  math.min(3.0, actualSpend / expectedSpend) // cap at 3x overspend
-}
-```
+### Dimension 6: budgetExhaustionRate
 
-**Why it matters:** This is the single most important pacing signal. It directly tells the agent whether it needs to speed up or slow down. The `budgetRemaining` and `timeRemaining` dimensions give raw position; `spendRate` gives velocity.
+The fraction of serve attempts denied because the campaign's budget was exhausted.
 
-### Dimension 6: impressionRate
-
-The number of impressions in the last window, normalized by a baseline expectation of 100 impressions per window.
-
-**Why it matters:** This tells the agent about traffic volume. If impression rate is 2.0, the market is busy --- lots of inventory available. If it is 0.1, traffic is thin. The agent can learn to bid differently depending on market conditions: for example, saving budget during low-traffic periods (when impressions are scarce and expensive) and spending during high-traffic periods (when cheap inventory is plentiful).
-
-### Dimension 7: costPerClick
-
-The average cost per click in the last window, normalized by `maxCpm`.
-
-**Why it matters:** This is an efficiency metric. A high CPC means the agent is paying a lot for each click --- maybe it should bid lower to find cheaper inventory. A low CPC means clicks are coming cheaply --- a good time to be aggressive.
+**Why it matters:** This is the delayed consequence of a high floor. When only one bidder remains (others rejected by floor), that sole bidder pays floor price on every impression. Higher floor → higher per-impression cost → faster budget drain → budget exhaustion. The agent sees this signal before revenue drops to zero.
 
 ### Why normalization matters
 
-Notice that every dimension is capped and normalized. CTR is capped at 1.0. Effective CPM is capped at 2.0. Spend rate is capped at 3.0. This is important because neural networks work best when inputs are in similar numeric ranges. If one dimension ranged from 0 to 1 and another from 0 to 10,000, the large dimension would dominate training and the small one would be ignored.
+Every dimension is capped and normalized. Fill rate stays in [0, 1]. Bidder count is divided by 10. Revenue is divided by the floor baseline. This is important because neural networks work best when inputs are in similar numeric ranges.
 
-## Action: 7 discrete bid adjustments
+## Action: 7 discrete floor adjustments
 
-When the agent observes a state, it must choose one of 7 actions. Each action maps to a multiplicative adjustment applied to the current bid multiplier:
+When the agent observes a state, it must choose one of 7 actions. Each action maps to a multiplicative adjustment applied to the current floor:
 
-| Action | Adjustment | Meaning |
+| Action | Multiplier | Meaning |
 |:---:|:---:|:---|
-| 0 | 0.7x | Bid 30% less --- strong pullback |
-| 1 | 0.8x | Bid 20% less --- conserve budget |
-| 2 | 0.9x | Bid 10% less --- slight reduction |
-| 3 | 1.0x | Hold current bid |
-| 4 | 1.1x | Bid 10% more --- slight increase |
-| 5 | 1.2x | Bid 20% more --- be aggressive |
-| 6 | 1.4x | Bid 40% more --- strong push |
+| 0 | × 0.90 | Drop floor 10% — let more bidders in |
+| 1 | × 0.95 | Drop floor 5% — slight relaxation |
+| 2 | × 0.98 | Drop floor 2% — fine-tune down |
+| 3 | × 1.00 | Hold current floor |
+| 4 | × 1.02 | Raise floor 2% — fine-tune up |
+| 5 | × 1.05 | Raise floor 5% — slight tightening |
+| 6 | × 1.10 | Raise floor 10% — filter out low bidders |
 
-These adjustments are **cumulative**. If the multiplier is currently 1.0 and the agent picks action 5 (1.2x), the new multiplier becomes 1.2. If the agent then picks action 4 (1.1x), the multiplier becomes 1.2 * 1.1 = 1.32.
-
-The multiplier is clamped to `[0.5, 2.0]`:
+The floor is clamped to `[publisherMinFloor, maxObservedCPM × 0.80]`:
 
 ```scala
-val adjustment = config.dqnConfig.multiplierForAction(action)
-_bidMultiplier = math.max(
-  config.minMultiplier,
-  math.min(config.maxMultiplier, _bidMultiplier * adjustment)
+val effectiveMax = if (maxObservedCpmEver > 0)
+  math.min(config.maxFloorCpm, maxObservedCpmEver * config.maxFloorFraction)
+else config.maxFloorCpm
+_currentFloor = math.max(
+  _minFloor,
+  math.min(effectiveMax, _currentFloor * adjustment)
 )
 ```
 
-Notice the action space is **asymmetric** --- there is no 1.3x on the upward side, but there is a 0.7x on the downward side. The strongest downward action (0.7x) is a sharper cut than the strongest upward action (1.4x) relative to the hold action. This design reflects a practical observation: it is usually more urgent to *reduce* spending (budget exhaustion is irreversible) than to *increase* it (under-spending can be corrected later). A single "emergency brake" action of 0.7x can cut the bid sharply when needed.
+The 80% cap is crucial. Without it, the agent could push the floor above all bids, killing all revenue. With the cap, at least one bidder always remains competitive.
 
-Why **discrete** actions instead of a continuous output? Two reasons. First, discrete action spaces are simpler to learn with DQN (the algorithm Promovolve uses). Second, discrete actions make the agent's behavior interpretable --- you can look at a log and see "the agent chose action 0 (cut bid by 30%)" rather than "the agent output 0.7134."
+Why **discrete** actions instead of a continuous output? Two reasons. First, discrete action spaces are simpler to learn with DQN. Second, discrete actions make the agent's behavior interpretable --- you can look at a log and see "the agent chose action 6 (raise floor 10%)" rather than "the agent output 1.0847."
 
 ## Reward: what success looks like
 
-The reward function is where you encode *what you want the agent to optimize for*. Get it right, and the agent learns useful behavior. Get it wrong, and the agent finds creative ways to maximize the number you gave it while doing something you did not intend.
+The reward function encodes *what you want the agent to optimize for*. Get it right, and the agent learns useful behavior. Get it wrong, and the agent finds creative ways to maximize the number you gave it while doing something you did not intend.
 
 Here is the `computeReward()` method:
 
 ```scala
-private def computeReward(obs: Observation): Double = {
-  // Primary reward: clicks achieved in this window
-  val clickReward = windowClicks.toDouble
+private def computeReward(): Double = {
+  val fillRate = if (windowAuctions > 0) windowFilled.toDouble / windowAuctions else 0.0
+  val servedRevPerAuction = if (windowAuctions > 0) windowServedRevenue / windowAuctions else 0.0
+  val baseline = if (_currentFloor > 0) _currentFloor / 1000.0 else 0.0005
+  val normalizedRevenue = if (baseline > 0) servedRevPerAuction / baseline else 0.0
 
-  // Penalty for overspending (spend rate > 1.5x means burning too fast)
-  val rate = spendRate(obs)
-  val overspendPenalty = if (rate > 1.5) config.overspendPenalty * (rate - 1.5) else 0.0
+  val revenueReward = normalizedRevenue * fillRate
 
-  // Penalty for budget exhaustion
-  val exhaustionPenalty =
-    if (obs.budgetRemaining <= 0 && obs.timeRemaining > 0.1)
-      config.exhaustionPenalty
-    else 0.0
+  val emptyPenalty = if (fillRate < 0.5)
+    config.emptyAuctionPenaltyWeight * (0.5 - fillRate)
+  else 0.0
 
-  clickReward - overspendPenalty - exhaustionPenalty
+  val totalServeAttempts = windowServedImpressions + windowBudgetExhausted
+  val budgetExhaustionRate = if (totalServeAttempts > 0) windowBudgetExhausted.toDouble / totalServeAttempts else 0.0
+  val budgetPenalty = config.budgetExhaustionPenaltyWeight * budgetExhaustionRate
+
+  val volatilityPenalty = if (_prevFloor > 0)
+    config.volatilityPenaltyWeight * math.abs(_currentFloor - _prevFloor) / _prevFloor
+  else 0.0
+
+  revenueReward - emptyPenalty - volatilityPenalty - budgetPenalty
 }
 ```
 
-The reward has three components:
+### Primary reward: revenue × fill rate
 
-### Primary reward: clicks
+The normalized revenue multiplied by fill rate. This provides a gradient signal even when revenue is zero — if the floor is slightly too high, fill rate drops to 0.6 and the reward decreases proportionally, rather than suddenly falling off a cliff.
 
-The number of clicks in the last 15-minute window. This is the main objective. More clicks = higher reward.
+### Penalty: empty auctions
 
-Why clicks and not impressions? Because impressions are easy to buy --- just bid high and you win every auction. But that burns budget on impressions nobody clicks. Clicks are a better proxy for advertiser value.
+When fill rate drops below 50%, a linear penalty kicks in. This tells the agent "you are losing too many bidders."
 
-### Penalty: overspending
+### Penalty: budget exhaustion (weight = 2.0)
 
-If the spend rate exceeds 1.5x the ideal pace, the agent receives a penalty proportional to the excess. The penalty factor is 2.0 by default, so:
+The strongest penalty. When advertisers' budgets exhaust because the floor is too high (high per-impression cost → fast budget drain), this penalty fires. It provides an early warning before revenue drops to zero.
 
-- Spend rate of 1.5x: no penalty
-- Spend rate of 2.0x: penalty of 2.0 * (2.0 - 1.5) = 1.0
-- Spend rate of 3.0x: penalty of 2.0 * (3.0 - 1.5) = 3.0
+### Penalty: volatility
 
-Notice the threshold of 1.5x. The agent is allowed to spend somewhat faster than ideal --- maybe there is good inventory available right now and it makes sense to grab it. But once spending exceeds 1.5x the ideal rate, the penalty kicks in, growing linearly. This gives the agent a "soft budget" rather than a hard constraint: overspend a little if the clicks are worth it, but not too much.
+A proportional penalty for large floor changes. Publishers and advertisers need price stability — a floor that jumps 20% every 15 minutes is disruptive.
 
-### Penalty: budget exhaustion
+## Episode structure
 
-If the budget hits zero while more than 10% of the delivery period remains, the agent receives a flat penalty of 5.0. This is the "hard lesson" --- you ran out of money with hours left in the day. A penalty of 5.0 is severe (it might take several windows of good clicks to make up for it), which teaches the agent to avoid this outcome.
+In many RL problems, there is a clear episode boundary — the game ends, the maze is solved, the robot reaches a goal. In floor optimization, episodes are less defined. The agent runs continuously, and the market never truly "resets."
 
-The 10% threshold prevents penalizing the agent for running out of budget in the last few minutes of the day, which is often fine or even desirable --- you *want* to use the full budget.
+In practice, day boundaries serve as soft episode markers. At the end of each day:
+- Budget counters reset
+- Traffic patterns restart their daily cycle
+- The agent stores a terminal transition and continues
 
-### Putting it together
+The agent's learned weights persist across episodes — it does not start fresh each day. This means the agent accumulates long-term market knowledge while adapting to daily fluctuations.
 
-The reward function says: "Get as many clicks as you can, but don't burn the budget too fast, and definitely don't exhaust it with a lot of time remaining." The agent learns to balance these competing objectives.
+## What is ahead
 
-```mermaid
-graph TD
-    R[Reward] --> C[+ Clicks in window]
-    R --> O[- Overspend penalty<br/>if spendRate > 1.5x]
-    R --> E[- Exhaustion penalty<br/>if budget=0 and time > 10% left]
-```
-
-## The discount factor: valuing the future
-
-The agent does not just maximize the reward from the current 15-minute window. It maximizes the **discounted sum** of all future rewards:
-
-```
-total = r_0 + gamma * r_1 + gamma^2 * r_2 + gamma^3 * r_3 + ...
-```
-
-Promovolve uses `gamma = 0.99`. This means a reward one step in the future is worth 99% of a reward right now. A reward two steps away is worth 0.99 * 0.99 = 98%. Twenty steps away: 0.99^20 = 82%.
-
-With gamma = 0.99, the agent strongly considers future consequences. If bidding aggressively now gets 5 extra clicks but causes budget exhaustion 6 windows from now (losing, say, 20 clicks worth of opportunity), the agent learns to avoid that trade. A lower gamma (say 0.9) would make the agent more myopic --- caring mostly about the next few windows. A higher gamma (say 0.999) would make the agent treat rewards an hour from now almost identically to rewards right now.
-
-The value 0.99 is a good default for this domain, where a day has roughly 96 fifteen-minute windows. After 96 steps, `0.99^96 = 0.38`, so the agent still cares meaningfully about what happens at the end of the day when making decisions at the beginning.
-
-## Episodes: one day, one episode
-
-In RL terminology, an **episode** is a complete sequence from start to finish. In Promovolve, one day equals one episode.
-
-At the start of the day, the agent begins with a `bidMultiplier` of 1.0 and the campaign has its full daily budget. Over the course of the day, the agent makes approximately 96 decisions (one per 15-minute window), each time adjusting the multiplier based on what it observes.
-
-At the end of the day, `resetDay()` is called:
-
-```scala
-def resetDay(): Unit = {
-  // Store terminal transition
-  for {
-    ps <- prevState
-    pa <- prevAction
-  } {
-    val terminalState = Array.fill(config.dqnConfig.stateSize)(0.0)
-    val terminalReward = windowClicks.toDouble
-    dqn.store(ps, pa, terminalReward, terminalState, done = true)
-  }
-
-  _bidMultiplier = 1.0
-  prevObservation = None
-  prevState = None
-  prevAction = None
-  // ... reset all window and day counters ...
-}
-```
-
-Two things happen here:
-
-1. **Terminal transition.** The agent stores a final experience with `done = true`. This tells the learning algorithm that there is no "next state" --- the episode is over. Future rewards after this point are zero. Without this signal, the agent would think the episode continues forever and assign inflated values to end-of-day states.
-
-2. **Reset to defaults.** The bid multiplier goes back to 1.0. All counters reset to zero. The agent starts fresh, but --- and this is important --- it **keeps its learned weights**. The neural network retains everything it learned from previous days. Tomorrow, the agent starts from the same bid multiplier (1.0) but makes *better decisions* because it has more experience to draw on.
-
-Over many episodes (days), the agent's policy improves. Early on, it explores randomly and makes mistakes --- overspending, underspending, missing cheap inventory. Over time, it learns patterns: "when budget is at 60% and time is at 40%, I should bid conservatively" or "when win rate drops below 0.2, I should increase the multiplier."
-
-## The full picture
-
-Here is how all the pieces connect in a single 15-minute cycle:
-
-```mermaid
-sequenceDiagram
-    participant CE as CampaignEntity<br/>(fast path)
-    participant BOA as BidOptimizationAgent<br/>(slow path)
-    participant Env as Ad Marketplace
-
-    Note over CE: Handles bid requests<br/>using current bidMultiplier
-    CE->>Env: bid = maxCpm * bidMultiplier
-    Env-->>CE: win/loss, impressions, clicks
-
-    Note over BOA: Every 15 minutes
-    CE->>BOA: Observation(maxCpm, budget, time, ...)
-    BOA->>BOA: toState() → 8-dim vector
-    BOA->>BOA: computeReward() → clicks - penalties
-    BOA->>BOA: Store (state, action, reward, nextState)
-    BOA->>BOA: Train DQN on replay buffer
-    BOA->>BOA: Select new action (epsilon-greedy)
-    BOA->>BOA: Apply action → new bidMultiplier
-    BOA-->>CE: updated bidMultiplier
-    Note over CE: Next 15 min: uses<br/>new bidMultiplier
-```
-
-In the next chapter, we will look inside the DQN --- the neural network and learning algorithm that powers the agent's decision-making.
+In the next chapter, we will build a neural network from scratch — no TensorFlow, no PyTorch, just arrays and arithmetic. This network will learn to estimate how valuable each action is in each state, which is the foundation of the DQN algorithm the floor agent uses.

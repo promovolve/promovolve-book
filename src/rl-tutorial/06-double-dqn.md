@@ -318,13 +318,13 @@ Each of the three (state, target) pairs is fed through `qNetwork.train(...)`, wh
 totalLoss / batchSize = average MSE across the 3 transitions
 ```
 
-This is one training step. In Promovolve, this happens every 15 minutes when the `BidOptimizationAgent.observe()` method is called.
+This is one training step. In Promovolve, this happens every 15 minutes when the `FloorCpmOptimizationAgent.observe()` method is called.
 
 ## Putting It All Together
 
 Here is the full picture of how Double DQN training works in Promovolve, from observation to weight update:
 
-1. Every 15 minutes, `BidOptimizationAgent.observe()` is called with the current campaign metrics.
+1. Every 15 minutes, `FloorCpmOptimizationAgent.observe()` is called with the current campaign metrics.
 2. The agent computes the reward from the previous action and stores the transition `(prevState, prevAction, reward, currentState, done)` in the replay buffer.
 3. `DQNAgent.trainStep()` samples 32 random transitions from the buffer.
 4. For each transition, it computes a Double DQN target: the Q-network selects the best next action, the target network evaluates it.
@@ -334,8 +334,8 @@ Here is the full picture of how Double DQN training works in Promovolve, from ob
 8. Every 100 training steps, the target network is synced with the Q-network.
 9. Epsilon decays slightly, shifting the balance from exploration toward exploitation.
 
-The result is an agent that steadily improves its bid multiplier decisions over days and weeks of operation, without the runaway overestimation that would cause it to blow through campaign budgets.
+The result is an agent that steadily improves its floor price decisions over days and weeks of operation, without the runaway overestimation that would cause it to blow through campaign budgets.
 
 ---
 
-Next chapter: we have covered the neural network, the replay buffer, and the Double DQN training loop. Now it is time to see how these components wire together in the `BidOptimizationAgent` and connect to the live auction system.
+Next chapter: we have covered the neural network, the replay buffer, and the Double DQN training loop. Now it is time to see how these components wire together in the `FloorCpmOptimizationAgent` and connect to the live auction system.

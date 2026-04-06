@@ -8,7 +8,7 @@ This chapter covers the Deep Q-Network (DQN) algorithm as implemented in Promovo
 
 A Q-value, written Q(state, action), answers a precise question: "If I am in this state and take this action, then act optimally from here on, what total reward can I expect?"
 
-In Promovolve's ad bidding system, the state describes a campaign's current situation (8 numbers: effective CPM, CTR, win rate, budget remaining, time remaining, spend rate, impression rate, cost per click). The actions are 7 bid multiplier adjustments (0.7x through 1.4x). So Q(state, action=3) means: "Given the campaign's current metrics, if I hold the bid steady at 1.0x and then act optimally for the rest of the day, how many clicks will I get?"
+In Promovolve's ad bidding system, the state describes a campaign's current situation (8 numbers: effective CPM, CTR, win rate, budget remaining, time remaining, spend rate, impression rate, cost per click). The actions are 7 floor price adjustments (0.7x through 1.4x). So Q(state, action=3) means: "Given the campaign's current metrics, if I hold the bid steady at 1.0x and then act optimally for the rest of the day, how many clicks will I get?"
 
 The agent's policy is simple: always pick the action with the highest Q-value. If the Q-values are accurate, this is optimal behavior.
 
@@ -309,7 +309,7 @@ Let's summarize how all the pieces fit together in Promovolve's bid optimization
 
 5. The agent selects an action using epsilon-greedy: either a random action (exploration) or the action with the highest Q-value (exploitation).
 
-6. The selected action maps to a bid multiplier adjustment (e.g., action 5 -> 1.2x), which is applied to the campaign's base CPM.
+6. The selected action maps to a floor price adjustment (e.g., action 5 -> 1.2x), which is applied to the campaign's base CPM.
 
 7. Over the next 15 minutes, the adjusted bid competes in auctions. The results (impressions, clicks, spend) become the next observation, and the cycle repeats.
 

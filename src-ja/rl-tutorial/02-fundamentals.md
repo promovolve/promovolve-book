@@ -19,9 +19,9 @@ Agentの目標は、時間をかけて蓄積するrewardの合計を最大化す
 
 これだけです。これがフレームワークのすべてです。それでは、各要素を広告入札の問題にマッピングしてみましょう。
 
-## Agent: BidOptimizationAgent
+## Agent: FloorCpmOptimizationAgent
 
-Promovolveでは、各キャンペーンが独自の`BidOptimizationAgent`を持ちます。これがagentです。15分ごとに起動し、キャンペーンのパフォーマンスを確認し、bid multiplierを増やすか、減らすか、維持するかを決定します。
+Promovolveでは、各キャンペーンが独自の`FloorCpmOptimizationAgent`を持ちます。これがagentです。15分ごとに起動し、キャンペーンのパフォーマンスを確認し、bid multiplierを増やすか、減らすか、維持するかを決定します。
 
 Agentは個々の広告リクエストを見ません。どのユーザーがクリックしたか、どのパブリッシャーが広告を配信したかも知りません。最後の15分間のウィンドウからの集約メトリクスのみを見ます: 合計インプレッション、合計クリック、合計支出、勝率。これは意図的なものです --- agentは粗い時間スケールで動作し、戦術的ではなく戦略的な意思決定を行います。
 
@@ -33,7 +33,7 @@ Environmentは、agentの制御の*外側*にあるすべてのものです: 他
 
 ## State: agentが観測するもの
 
-15分ごとに、agentはキャンペーンの現在のメトリクスから8次元のstate vectorを構築します。各次元は数値で、通常0から2の範囲に正規化されています。以下は`BidOptimizationAgent.scala`の`toState()`メソッドです:
+15分ごとに、agentはキャンペーンの現在のメトリクスから8次元のstate vectorを構築します。各次元は数値で、通常0から2の範囲に正規化されています。以下は`FloorCpmOptimizationAgent.scala`の`toState()`メソッドです:
 
 ```scala
 private def toState(obs: Observation): Array[Double] = {
@@ -279,7 +279,7 @@ def resetDay(): Unit = {
 ```mermaid
 sequenceDiagram
     participant CE as CampaignEntity<br/>(fast path)
-    participant BOA as BidOptimizationAgent<br/>(slow path)
+    participant BOA as FloorCpmOptimizationAgent<br/>(slow path)
     participant Env as Ad Marketplace
 
     Note over CE: Handles bid requests<br/>using current bidMultiplier

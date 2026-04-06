@@ -4,7 +4,7 @@ Most RL tutorials end with a training loop and a plot of rising rewards. Real sy
 
 ## Episodes are days
 
-In the textbook formulation, an RL episode is a sequence of states and actions that ends when the agent reaches a terminal state. In Promovolve, each delivery day is one episode. The agent starts the day with a bid multiplier of 1.0, makes observations every 15 minutes throughout the day, and the episode ends at midnight (or when the budget runs out, whichever comes first).
+In the textbook formulation, an RL episode is a sequence of states and actions that ends when the agent reaches a terminal state. In Promovolve, each delivery day is one episode. The agent starts the day with a floor price of 1.0, makes observations every 15 minutes throughout the day, and the episode ends at midnight (or when the budget runs out, whichever comes first).
 
 The `resetDay()` method handles the transition between episodes:
 
@@ -44,7 +44,7 @@ There is a lot happening here, so let's break it down.
 
 The `for` comprehension guards against the case where `observe()` was never called during the day (perhaps the campaign was paused). In that case there is no pending state or action, so there is nothing to record.
 
-**Reset the multiplier.** The bid multiplier goes back to 1.0. Each day starts fresh. The agent does not carry forward yesterday's multiplier because the market conditions, traffic patterns, and competitive landscape may be completely different today.
+**Reset the multiplier.** The floor price goes back to 1.0. Each day starts fresh. The agent does not carry forward yesterday's multiplier because the market conditions, traffic patterns, and competitive landscape may be completely different today.
 
 **Clear all counters.** Window counters, day counters, and the previous state/action references are all zeroed out.
 
@@ -135,7 +135,7 @@ This sounds bad, but it is actually fine. When you know nothing, random explorat
 
 Here is the timeline for a new campaign:
 
-**Hours 0-8 (observations 1-32).** The agent takes random actions and accumulates transitions. No training happens because the replay buffer has not reached its minimum size of 32. The bid multiplier bounces around randomly within the [0.5, 2.0] bounds. This is wasteful but unavoidable -- the agent needs data before it can learn.
+**Hours 0-8 (observations 1-32).** The agent takes random actions and accumulates transitions. No training happens because the replay buffer has not reached its minimum size of 32. The floor price bounces around randomly within the [0.5, 2.0] bounds. This is wasteful but unavoidable -- the agent needs data before it can learn.
 
 **Hours 8-24 (observations 33-96).** Training begins. Each observation now triggers a training step: sample 32 transitions from the buffer, compute Double DQN targets, update the Q-network. Epsilon is still high (around 0.85 after 64 training steps), so most actions are still random, but the Q-values are starting to become meaningful.
 
@@ -143,11 +143,11 @@ Here is the timeline for a new campaign:
 
 **Week 2 and beyond.** Epsilon has hit its floor of 0.05. The agent is 95% exploitation, 5% exploration. It has developed a stable policy tuned to this campaign's traffic patterns, budget, and competitive environment. The 5% exploration ensures it can adapt if conditions change.
 
-This is slow. It takes days of real data to produce a competent agent. This is one reason why Promovolve does not rely solely on RL for bid optimization. A separate PI (proportional-integral) pacing controller handles real-time delivery smoothing within each observation window. RL optimizes the overall bidding strategy over days; PI keeps delivery smooth within hours.
+This is slow. It takes days of real data to produce a competent agent. This is one reason why Promovolve does not rely solely on RL for floor CPM optimization. A separate PI (proportional-integral) pacing controller handles real-time delivery smoothing within each observation window. RL optimizes the overall bidding strategy over days; PI keeps delivery smooth within hours.
 
 ## Multiple agents, one marketplace
 
-Every campaign in Promovolve has its own `BidOptimizationAgent`. If there are 50 active campaigns, there are 50 independent agents, each with its own Q-network, replay buffer, and epsilon schedule. They do not communicate with each other and have no knowledge of each other's existence.
+Every campaign in Promovolve has its own `FloorCpmOptimizationAgent`. If there are 50 active campaigns, there are 50 independent agents, each with its own Q-network, replay buffer, and epsilon schedule. They do not communicate with each other and have no knowledge of each other's existence.
 
 This creates an interesting situation. From any one agent's perspective, the environment is non-stationary: the other 49 agents are also adjusting their bids, which changes auction dynamics, win rates, and effective prices. An action that worked well yesterday might work poorly today because a competitor raised its bids overnight.
 
@@ -182,7 +182,7 @@ The key takeaway: RL is slow. It needs days of real data to produce results. Thi
 The `dayStats` method provides a daily summary for dashboards:
 
 ```scala
-def dayStats: BidOptimizationAgent.DayStats = BidOptimizationAgent.DayStats(
+def dayStats: FloorCpmOptimizationAgent.DayStats = FloorCpmOptimizationAgent.DayStats(
   impressions = dayImpressions,
   clicks = dayClicks,
   spend = daySpend,

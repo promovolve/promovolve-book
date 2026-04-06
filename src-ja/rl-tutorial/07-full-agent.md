@@ -1,22 +1,22 @@
-# すべてを組み合わせる：BidOptimizationAgent
+# すべてを組み合わせる：FloorCpmOptimizationAgent
 
 ここまで、Q値を推定するニューラルネットワーク、経験を蓄積するreplay buffer、そしてその経験から学習するDouble DQN学習ループと、すべてのパーツを個別に構築してきました。いよいよ、Promovolveがこれらを一つの動作する入札最適化エージェントとしてどのように組み上げるかを見ていきましょう。
 
-そのクラスは `BidOptimizationAgent` で、`modules/core/src/main/scala/promovolve/rl/BidOptimizationAgent.scala` にあります。上から順に見ていきます。
+そのクラスは `FloorCpmOptimizationAgent` で、`modules/core/src/main/scala/promovolve/rl/FloorCpmOptimizationAgent.scala` にあります。上から順に見ていきます。
 
 ## アーキテクチャ
 
 ネスト構造は以下のようになっています：
 
 ```text
-BidOptimizationAgent          (one per campaign)
+FloorCpmOptimizationAgent          (one per campaign)
   └── DQNAgent
        ├── qNetwork           (DenseNetwork: 8 → 64 → 64 → 7)
        ├── targetNetwork      (DenseNetwork: 8 → 64 → 64 → 7, periodically synced)
        └── replayBuffer       (ReplayBuffer: capacity 10,000)
 ```
 
-`BidOptimizationAgent` は、キャンペーン、予算、広告配信について知っている外側のシェルです。現実のキャンペーン指標を、内側の `DQNAgent` が理解できるstate、action、rewardという抽象的な言語に変換します。`DQNAgent` は、前の章で構築した2つのニューラルネットワークとreplay bufferを所有しています。
+`FloorCpmOptimizationAgent` は、キャンペーン、予算、広告配信について知っている外側のシェルです。現実のキャンペーン指標を、内側の `DQNAgent` が理解できるstate、action、rewardという抽象的な言語に変換します。`DQNAgent` は、前の章で構築した2つのニューラルネットワークとreplay bufferを所有しています。
 
 一行で内部スタック全体が生成されます：
 
@@ -24,7 +24,7 @@ BidOptimizationAgent          (one per campaign)
 private val dqn = DQNAgent(config.dqnConfig, rng)
 ```
 
-`BidOptimizationAgent` のそれ以外の部分はすべて補助的な処理です：ウィンドウカウンターの追跡、stateの計算、rewardの計算、そしてactionをbidMultiplierに反映することです。
+`FloorCpmOptimizationAgent` のそれ以外の部分はすべて補助的な処理です：ウィンドウカウンターの追跡、stateの計算、rewardの計算、そしてactionをfloorCpmに反映することです。
 
 ## 設定
 
@@ -59,7 +59,7 @@ final case class Config(
 
 **7つのaction、非対称。** actionMultiplierは `[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.4]` です。1.0を中心に対称ではないことに注意してください。入札を上げるオプション（1.1, 1.2, 1.4）の方が下げるオプション（0.7, 0.8, 0.9）より多く、最も積極的な上方オプション（1.4倍）は最も積極的な下方オプション（0.7倍）よりも大きなジャンプです。これは意図的な設計選択を反映しています：競争的なオークションでは、インプレッションを逃すことの方が、わずかに過払いすることよりも悪い結果になることが多いのです。エージェントは必要なときにブレーキを強く踏むことができますが（0.7倍）、予算消化が遅れていてすぐに追いつく必要があるときのための「ターボ」オプション（1.4倍）も持っています。
 
-**ハードバウンド：0.5から2.0。** エージェントがどんなactionの組み合わせをとっても、累積bidMultiplierはこの範囲にクランプされます。キャンペーンが基本CPMの半分以下で入札することも、2倍以上で入札することもありません。これはRLエージェントが壊滅的なことをするのを防ぐ安全柵です。
+**ハードバウンド：0.5から2.0。** エージェントがどんなactionの組み合わせをとっても、累積floorCpmはこの範囲にクランプされます。キャンペーンが基本CPMの半分以下で入札することも、2倍以上で入札することもありません。これはRLエージェントが壊滅的なことをするのを防ぐ安全柵です。
 
 **割引率（gamma = 0.99）。** エージェントは将来のrewardを即時のrewardとほぼ同等に評価します。日次予算ペーシングにおいてこれは理にかなっています：序盤に数回クリックが得られたからといって、最初の1時間で予算を使い切ってしまうエージェントは望ましくありません。
 
@@ -103,7 +103,7 @@ private def toState(obs: Observation): Array[Double] = {
 
   Array(
     // 0: effective CPM (normalized)
-    math.min(2.0, (obs.maxCpm * _bidMultiplier) / maxCpm),
+    math.min(2.0, (obs.maxCpm * _floorCpm) / maxCpm),
     // 1: CTR in window
     if (windowImpressions > 0) math.min(1.0, windowClicks.toDouble / windowImpressions)
     else 0.0,
@@ -129,7 +129,7 @@ private def toState(obs: Observation): Array[Double] = {
 
 | Index | Feature | What it means |
 |-------|---------|---------------|
-| 0 | Effective CPM | 基本価格に対して現在どれだけ入札しているか。bidMultiplier自体に等しい。 |
+| 0 | Effective CPM | 基本価格に対して現在どれだけ入札しているか。floorCpm自体に等しい。 |
 | 1 | CTR | 直近15分間のクリック率。高いほど良い。 |
 | 2 | Win rate | オークションの勝率。低い場合は他に負けている。 |
 | 3 | Budget remaining | 今日の残り予算（1.0 = 満額、0.0 = 空）。 |
@@ -221,9 +221,9 @@ def observe(obs: Observation): (Double, Option[Double]) = {
 
   // Apply action: adjust multiplier
   val adjustment = config.dqnConfig.multiplierForAction(action)
-  _bidMultiplier = math.max(
+  _floorCpm = math.max(
     config.minMultiplier,
-    math.min(config.maxMultiplier, _bidMultiplier * adjustment)
+    math.min(config.maxMultiplier, _floorCpm * adjustment)
   )
 
   // Save state for next observation
@@ -238,7 +238,7 @@ def observe(obs: Observation): (Double, Option[Double]) = {
   windowBidOpportunities = 0
   windowWins = 0
 
-  (_bidMultiplier, loss)
+  (_floorCpm, loss)
 }
 ```
 
@@ -250,13 +250,13 @@ def observe(obs: Observation): (Double, Option[Double]) = {
 
 **ステップ3：次のactionを選択。** inference-onlyモードの場合は、最もQ値の高いactionを選びます。それ以外はepsilon-greedyを使用します：確率epsilonでランダムなactionを、そうでなければ貪欲な最善手を選びます。
 
-**ステップ4：actionを適用。** 選択されたactionのmultiplierを参照し（例：action 4は1.1倍に対応）、現在のbidMultiplierに掛けて、結果を[0.5, 2.0]にクランプします。
+**ステップ4：actionを適用。** 選択されたactionのmultiplierを参照し（例：action 4は1.1倍に対応）、現在のfloorCpmに掛けて、結果を[0.5, 2.0]にクランプします。
 
 **ステップ5：次回のためにstateを保存。** 次の観測時にrewardを計算して遷移を構築できるよう、現在のstateとactionを保存します。
 
 **ステップ6：ウィンドウカウンターをリセット。** 次の15分ウィンドウに備えて、インプレッション、クリック、支出、入札機会のすべてのカウンターをクリアします。
 
-メソッドは新しいbidMultiplierと学習ロス（学習が行われた場合）を返します。CampaignEntityは次の観測までのすべての入札応答にこのbidMultiplierを使用します。
+メソッドは新しいfloorCpmと学習ロス（学習が行われた場合）を返します。CampaignEntityは次の観測までのすべての入札応答にこのfloorCpmを使用します。
 
 ## 累積multiplier
 
@@ -276,9 +276,9 @@ def observe(obs: Observation): (Double, Option[Double]) = {
 観測6に注目してください：生の結果は2.074ですが、最大値を超えているため2.0にクランプされます。ハードバウンドは常に適用されます。これがコードにおける安全メカニズムです：
 
 ```scala
-_bidMultiplier = math.max(
+_floorCpm = math.max(
   config.minMultiplier,
-  math.min(config.maxMultiplier, _bidMultiplier * adjustment)
+  math.min(config.maxMultiplier, _floorCpm * adjustment)
 )
 ```
 
@@ -289,7 +289,7 @@ _bidMultiplier = math.max(
 エージェントは監視ダッシュボード用に累積日次指標を追跡します：
 
 ```scala
-def dayStats: BidOptimizationAgent.DayStats = BidOptimizationAgent.DayStats(
+def dayStats: FloorCpmOptimizationAgent.DayStats = FloorCpmOptimizationAgent.DayStats(
   impressions = dayImpressions,
   clicks = dayClicks,
   spend = daySpend,
@@ -317,7 +317,7 @@ final case class DayStats(
 
 ## まとめ
 
-`BidOptimizationAgent` は薄い変換レイヤーです。インプレッション、クリック、予算、時刻という雑多な現実世界を、DQNが必要とするきれいな抽象概念 -- 固定サイズのstateベクトル、離散的なaction、スカラーのreward -- に変換します。実際の学習は、前の章で構築した `DQNAgent` の内部で行われます。
+`FloorCpmOptimizationAgent` は薄い変換レイヤーです。インプレッション、クリック、予算、時刻という雑多な現実世界を、DQNが必要とするきれいな抽象概念 -- 固定サイズのstateベクトル、離散的なaction、スカラーのreward -- に変換します。実際の学習は、前の章で構築した `DQNAgent` の内部で行われます。
 
 主要な設計上の判断は以下の通りです：
 

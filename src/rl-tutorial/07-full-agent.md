@@ -1,22 +1,22 @@
-# Putting It Together: The BidOptimizationAgent
+# Putting It Together: The FloorCpmOptimizationAgent
 
-We have built every piece individually: a neural network that estimates Q-values, a replay buffer that stores experience, and a Double DQN training loop that learns from that experience. Now it is time to see how Promovolve wires them into a single, working bid optimization agent.
+We have built every piece individually: a neural network that estimates Q-values, a replay buffer that stores experience, and a Double DQN training loop that learns from that experience. Now it is time to see how Promovolve wires them into a single, working floor CPM agent.
 
-The class is `BidOptimizationAgent`, and it lives in `modules/core/src/main/scala/promovolve/rl/BidOptimizationAgent.scala`. We will walk through it top to bottom.
+The class is `FloorCpmOptimizationAgent`, and it lives in `modules/core/src/main/scala/promovolve/rl/FloorCpmOptimizationAgent.scala`. We will walk through it top to bottom.
 
 ## The architecture
 
 The nesting looks like this:
 
 ```text
-BidOptimizationAgent          (one per campaign)
+FloorCpmOptimizationAgent          (one per campaign)
   └── DQNAgent
        ├── qNetwork           (DenseNetwork: 8 → 64 → 64 → 7)
        ├── targetNetwork      (DenseNetwork: 8 → 64 → 64 → 7, periodically synced)
        └── replayBuffer       (ReplayBuffer: capacity 10,000)
 ```
 
-`BidOptimizationAgent` is the outer shell that knows about campaigns, budgets, and ad serving. It translates real-world campaign metrics into the abstract language of states, actions, and rewards that the inner `DQNAgent` understands. The `DQNAgent` in turn owns the two neural networks and the replay buffer we built in earlier chapters.
+`FloorCpmOptimizationAgent` is the outer shell that knows about campaigns, budgets, and ad serving. It translates real-world campaign metrics into the abstract language of states, actions, and rewards that the inner `DQNAgent` understands. The `DQNAgent` in turn owns the two neural networks and the replay buffer we built in earlier chapters.
 
 One line creates the entire inner stack:
 
@@ -24,7 +24,7 @@ One line creates the entire inner stack:
 private val dqn = DQNAgent(config.dqnConfig, rng)
 ```
 
-Everything else in `BidOptimizationAgent` is bookkeeping: tracking window counters, computing states, computing rewards, and applying actions back to the bid multiplier.
+Everything else in `FloorCpmOptimizationAgent` is bookkeeping: tracking window counters, computing states, computing rewards, and applying actions back to the floor price.
 
 ## Configuration
 
@@ -59,7 +59,7 @@ Let's unpack the important choices.
 
 **7 actions, asymmetric.** The action multipliers are `[0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.4]`. Notice they are not symmetric around 1.0. There are more options for bidding up (1.1, 1.2, 1.4) than for bidding down (0.7, 0.8, 0.9), and the most aggressive upward option (1.4x) is a bigger jump than the most aggressive downward option (0.7x). This reflects a deliberate design choice: in a competitive auction, missing out on impressions is often worse than slightly overpaying. The agent can slam the brakes hard when it needs to (0.7x), but it also has a "turbo" option (1.4x) for when it is underspending and needs to catch up fast.
 
-**Hard bounds: 0.5 to 2.0.** No matter what sequence of actions the agent takes, the cumulative bid multiplier is clamped to this range. A campaign will never bid less than half its base CPM, and never more than double. This is a safety rail that prevents the RL agent from doing anything catastrophic.
+**Hard bounds: 0.5 to 2.0.** No matter what sequence of actions the agent takes, the cumulative floor price is clamped to this range. A campaign will never bid less than half its base CPM, and never more than double. This is a safety rail that prevents the RL agent from doing anything catastrophic.
 
 **Discount factor (gamma = 0.99).** The agent values future rewards almost as much as immediate ones. This makes sense for daily budget pacing: you do not want an agent that burns through the budget in the first hour just because it got a few clicks early on.
 
@@ -129,7 +129,7 @@ Each dimension is normalized to a small range (roughly 0 to 2) so the neural net
 
 | Index | Feature | What it means |
 |-------|---------|---------------|
-| 0 | Effective CPM | How much we are currently bidding, relative to the base price. Equals the bid multiplier itself. |
+| 0 | Effective CPM | How much we are currently bidding, relative to the base price. Equals the floor price itself. |
 | 1 | CTR | Click-through rate in the last 15 minutes. Higher is better. |
 | 2 | Win rate | Fraction of auctions we won. Low means we are being outbid. |
 | 3 | Budget remaining | How much money is left today (1.0 = full, 0.0 = empty). |
@@ -250,13 +250,13 @@ Let's trace through what happens on each call, step by step.
 
 **Step 3: Choose the next action.** If we are in inference-only mode, pick the action with the highest Q-value. Otherwise, use epsilon-greedy: with probability epsilon pick a random action, otherwise pick the greedy best.
 
-**Step 4: Apply the action.** Look up the chosen action's multiplier (e.g., action 4 maps to 1.1x), multiply it into the current bid multiplier, and clamp the result to [0.5, 2.0].
+**Step 4: Apply the action.** Look up the chosen action's multiplier (e.g., action 4 maps to 1.1x), multiply it into the current floor price, and clamp the result to [0.5, 2.0].
 
 **Step 5: Save state for next time.** Store the current state and action so that on the next observation we can compute the reward and build a transition.
 
 **Step 6: Reset window counters.** Clear all the impression, click, spend, and bid opportunity counters so they are fresh for the next 15-minute window.
 
-The method returns the new bid multiplier and the training loss (if training happened). The CampaignEntity uses the bid multiplier for all bid responses until the next observation.
+The method returns the new floor price and the training loss (if training happened). The CampaignEntity uses the floor price for all bid responses until the next observation.
 
 ## The cumulative multiplier
 
@@ -289,7 +289,7 @@ This cumulative design means the agent can make large adjustments over several s
 The agent tracks cumulative daily metrics for monitoring dashboards:
 
 ```scala
-def dayStats: BidOptimizationAgent.DayStats = BidOptimizationAgent.DayStats(
+def dayStats: FloorCpmOptimizationAgent.DayStats = FloorCpmOptimizationAgent.DayStats(
   impressions = dayImpressions,
   clicks = dayClicks,
   spend = daySpend,
@@ -317,7 +317,7 @@ These numbers let operators see how the agent is performing day over day. Is it 
 
 ## Recap
 
-`BidOptimizationAgent` is a thin translation layer. It converts the messy real world -- impressions, clicks, budgets, time of day -- into the clean abstractions that DQN needs: fixed-size state vectors, discrete actions, and scalar rewards. The actual learning happens inside `DQNAgent`, which we built in earlier chapters.
+`FloorCpmOptimizationAgent` is a thin translation layer. It converts the messy real world -- impressions, clicks, budgets, time of day -- into the clean abstractions that DQN needs: fixed-size state vectors, discrete actions, and scalar rewards. The actual learning happens inside `DQNAgent`, which we built in earlier chapters.
 
 The key design decisions are:
 
