@@ -26,11 +26,11 @@ For each ranked category, the AuctioneerEntity asks the `CategoryBidderEntity`: 
 
 The CategoryBidderEntity fans out to all campaigns registered for that category. Each CampaignEntity evaluates whether it should bid:
 
-**Takeshi's Ryokan** (Travel, Hiking): Budget remaining? Yes ($20). Campaign active? Yes. Creative approved for this site? Yes. Bid: `$5.00 × 1.0 (RL multiplier) = $5.00 CPM`.
+**Takeshi's Ryokan** (Travel, Hiking): Budget remaining? Yes ($20). Campaign active? Yes. Creative approved for this site? Yes. Bid: **$5.00 CPM**.
 
-**JR Rail Pass** (Travel): Budget remaining? Yes. Bid: `$8.00 × 1.0 = $8.00 CPM`.
+**JR Rail Pass** (Travel): Budget remaining? Yes. Bid: **$8.00 CPM**.
 
-**Hiking Gear Co** (Hiking): Budget remaining? Yes. Bid: `$4.00 × 1.0 = $4.00 CPM`.
+**Hiking Gear Co** (Hiking): Budget remaining? Yes. Bid: **$4.00 CPM**.
 
 **Kyoto Cooking Class** (Food & Drink): This campaign isn't registered for Travel, Hiking, or East Asian Culture. It doesn't bid.
 
@@ -82,9 +82,9 @@ In about 4 seconds of background processing:
 
 1. An LLM classified the page content into advertising categories
 2. Thompson Sampling ranked those categories by historical performance on this site
-3. Eligible campaigns placed bids based on their max CPM and RL multiplier
-4. Fair selection ensured each campaign got representation
-5. Multiple candidates per slot were cached in replicated memory across the cluster
+3. Eligible campaigns placed bids at their max CPM
+4. All competitive bids passed through to serve-time selection
+5. Candidates were cached in replicated memory across the cluster
 
 No reader was involved. No page load was delayed. The entire auction happened in the background, and the results are sitting in memory, waiting.
 

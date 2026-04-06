@@ -42,18 +42,17 @@ Within each CategoryBidderEntity, a `CampaignDistributor` manages fan-out to ind
 
 ## Bid Request → Response
 
-Each `CampaignEntity` evaluates the request and responds with eligible creatives. The bid CPM is computed as:
+Each `CampaignEntity` evaluates the request and responds with eligible creatives. The bid CPM is simply the advertiser's max CPM:
 
 ```scala
-bidCpm = max(maxCpm × bidMultiplier, floorCpm)
+bidCpm = max(maxCpm, floorCpm)
 ```
 
 Where:
-- `maxCpm`: The campaign's configured maximum CPM (default: $5.00)
-- `bidMultiplier`: The RL agent's current multiplier, clamped to `[minMultiplier, maxMultiplier]`
-- `floorCpm`: The system floor price (default: $0.50)
+- `maxCpm`: The campaign's configured maximum CPM
+- `floorCpm`: The publisher's floor price (auto-optimized by the floor CPM agent)
 
-The RL agent ensures the bid never falls below floor even with a low multiplier.
+The advertiser bids their true value. There's no bid shading or multiplier — the quality-adjusted pricing at serve time ensures they only pay what's needed to win, not their full bid.
 
 ## Eligibility Filters (Campaign-Side)
 
@@ -71,7 +70,7 @@ A CampaignEntity will not respond if any of these checks fail:
 
 The CategoryBidderEntity aggregates responses:
 
-1. **CPM threshold**: Only candidates within **top 20%** of the highest CPM are kept: `cpm ≥ maxCpm × (1.0 - 0.20)`
+1. **CPM threshold**: Only candidates within **top 80%** of the highest CPM are kept: `cpm ≥ maxCpm × (1.0 - 0.80)`. This is deliberately wide — quality-adjusted pricing at serve time handles differentiation among competitive bids.
 2. **Campaign cap**: Maximum **50 campaigns** per category (`maxCampaignsPerCategory`), ranked by CPM descending
 3. **One creative per campaign**: The highest-CPM creative wins if a campaign has multiple eligible creatives
 

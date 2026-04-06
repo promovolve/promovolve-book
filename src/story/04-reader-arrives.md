@@ -44,14 +44,14 @@ This happens before creative selection. If the gate rejects the request, Thompso
 
 Now the system picks which creative to show. Both candidates are brand new — zero impressions, zero clicks. Their Beta distributions are both `Beta(1, 1)`, the uniform distribution.
 
-Thompson Sampling draws a random sample from each:
+Yuki has her site set to **Balanced** (α=0.5). Thompson Sampling draws a random sample from each candidate's Beta posterior:
 
 ```
 Takeshi's Ryokan: sample from Beta(1, 1) → 0.72
-  score = 0.72 × log(1 + 5.00) = 0.72 × 1.79 = 1.29
+  score = 0.72 × 5.00^0.5 = 0.72 × 2.24 = 1.61
 
 Hiking Gear Co:   sample from Beta(1, 1) → 0.34
-  score = 0.34 × log(1 + 4.00) = 0.34 × 1.61 = 0.55
+  score = 0.34 × 4.00^0.5 = 0.34 × 2.00 = 0.68
 ```
 
 Takeshi's ryokan wins this round. Not because it's better — nobody knows yet — but because its random sample happened to be higher. Next time, the hiking gear ad might win. With `Beta(1, 1)` on both sides, it's nearly a coin flip, weighted slightly by CPM.
@@ -60,15 +60,25 @@ This is pure exploration. Over the next hundred impressions, the system will lea
 
 ## Step 5: Budget Reservation
 
-Before serving the ad, the system reserves the spend. The CampaignEntity for Takeshi's campaign receives a `TryReserve` request:
+Before serving the ad, the system computes the clearing price and reserves the spend. Takeshi won on quality (higher CTR sample), so the price is quality-adjusted:
 
-- Amount: $5.00 / 1000 = $0.005 (one impression at $5 CPM)
+```
+Hiking Gear's losing score: 0.68
+Takeshi's sampled CTR: 0.72
+Payment: (0.68 / 0.72)^(1/0.5) = $0.89 CPM
+Floor: $0.50
+Clearing price: max($0.89, $0.50) = $0.89
+```
+
+Takeshi bid $5.00 but pays only $0.89 per thousand impressions. This is the quality discount — better creative quality means lower cost.
+
+The CampaignEntity for Takeshi's campaign receives a `TryReserve` request:
+
+- Amount: $0.89 / 1000 = $0.00089
 - Budget remaining: $16.00
-- Result: Reserved. Budget is now $15.995.
+- Result: Reserved. Budget is now $15.99911.
 
 If the budget were exhausted, the response would be `InsufficientBudget`, and Thompson Sampling would try the next candidate (Hiking Gear Co). If all candidates are exhausted, the response is `204 No Content`. Graceful degradation, no errors.
-
-The reservation is recorded in the CampaignEntity's ephemeral buffer. The RL agent notes the impression: `recordImpression($0.005)` and `recordBidOpportunity(won: true)`.
 
 ## Step 6: The Response
 

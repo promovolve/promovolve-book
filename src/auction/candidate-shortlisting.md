@@ -1,6 +1,6 @@
 # Phase 4: Candidate Shortlisting
 
-This is the critical phase where Promovolve diverges from traditional auctions. Instead of selecting a single winner, it creates a **shortlist of top-K candidates** per slot for serve-time exploration, using a fair selection algorithm that guarantees per-campaign diversity.
+This is the critical phase where Promovolve diverges from traditional auctions. Instead of selecting a single winner, it passes **all competitive candidates** to serve-time Thompson Sampling, using a fair ordering algorithm that guarantees per-campaign diversity.
 
 ## Fair Candidate Selection Algorithm
 
