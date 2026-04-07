@@ -69,6 +69,7 @@
   - [報酬関数](./rl/reward-function.md)
   - [Double DQNアーキテクチャ](./rl/double-dqn.md)
   - [学習ループとハイパーパラメータ](./rl/training.md)
+  - [A Week of Learning](./rl/simulation-results.md)
 
 ## 分散ステート
 

@@ -69,6 +69,7 @@
   - [Reward Function](./rl/reward-function.md)
   - [Double DQN Architecture](./rl/double-dqn.md)
   - [Training Loop & Hyperparameters](./rl/training.md)
+  - [A Week of Learning](./rl/simulation-results.md)
 
 ## Distributed State
 
