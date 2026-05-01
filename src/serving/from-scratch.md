@@ -95,16 +95,18 @@ Click rate isn't the only thing that matters. The publisher also cares about rev
 Promovolve's scoring formula balances both:
 
 ```
-score = sampledCTR × log(1 + CPM)
+score = sampledCTR × CPM^α
 ```
 
-Why `log(1 + CPM)` instead of just `CPM`?
+Why `CPM^α` instead of just `CPM`? The exponent α (publisher-tunable, default 0.5) compresses the CPM range so a creative has to perform well to win consistently — you can't just outbid everyone with a terrible ad.
 
-Consider two creatives:
-- A: $2 CPM, 4% CTR → score = 0.04 × log(3) = 0.04 × 1.10 = 0.044
-- B: $10 CPM, 1% CTR → score = 0.01 × log(11) = 0.01 × 2.40 = 0.024
+Consider two creatives at the default α=0.5:
+- A: $2 CPM, 4% CTR → score = 0.04 × √2 = 0.04 × 1.41 = 0.057
+- B: $10 CPM, 1% CTR → score = 0.01 × √10 = 0.01 × 3.16 = 0.032
 
-The logarithm compresses the CPM range. Bidding 5× more doesn't give you 5× the score — it gives you about 2× the score. This means a creative has to actually perform well (high CTR) to win consistently. You can't just outbid everyone with a terrible ad.
+Creative A wins despite bidding 5× less. Bidding 5× more gives you only ~2.2× the CPM term — quality dominates.
+
+The publisher chooses the exponent: α=0.3 (Discovery) tilts harder toward quality, α=0.7 (Revenue) tilts back toward higher bids. See [Scoring Formula](./scoring-formula.md) for the full dial.
 
 This aligns publisher and advertiser incentives: the publisher gets revenue AND engaged readers, not just the highest bidder's money.
 
@@ -167,7 +169,7 @@ The pacing gate runs **before** Thompson Sampling. This is important: if the pac
 | Concept | File | Key method |
 |---------|------|-----------|
 | Beta sampling (Marsaglia-Tsang) | `ThompsonSampling.scala` | `sampleBeta()` |
-| Score = sampledCTR × log(1+CPM) | `ThompsonSampling.scala` | `score()` |
+| Score = sampledCTR × CPM^α | `ThompsonSampling.scala` | `cpmScore()` / `scoreCandidate()` |
 | Cold start strategies | `ThompsonSampling.scala` | `select()` |
 | Time-bucketed creative stats | `AdServer.scala` | `CreativeStats` |
 | Pacing gate before TS | `SelectionLogic.scala` | `shouldServe()` then `select()` |

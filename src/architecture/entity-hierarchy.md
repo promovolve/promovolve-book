@@ -10,7 +10,6 @@ Advertiser (sharded by advertiserId)
   └── Campaigns: Set[CampaignId]
         └── Campaign (sharded by advertiserId|campaignId)
               ├── Budget: dailyBudget, spendToday, maxCpm
-              ├── RL Agent: BidOptimizationAgent (DQN snapshot)
               ├── Creative assignments: Set[CreativeId]
               ├── Spend buffer: 500ms / 20 events batching
               ├── Idempotency: BloomFilter (50K entries, 0.01% FPP)
@@ -47,7 +46,7 @@ Each entity type uses a different shard key optimized for its access pattern:
 | AuctioneerEntity | `siteId` | 100 | All pages on a site auction together |
 | CategoryBidderEntity | `category\|siteId\|shard` | 100 × 5 virtual | Distributes load within popular categories |
 | TaxonomyRankerEntity | `category\|siteId` | 100 | Co-located with bidder for low-latency |
-| CampaignEntity | `advertiserId\|campaignId` | 100 | Independent lifecycle, RL state per campaign |
+| CampaignEntity | `advertiserId\|campaignId` | 100 | Independent lifecycle, per-campaign budget and pacing state |
 | AdvertiserEntity | `advertiserId` | 100 | Budget and frequency caps per advertiser |
 | CampaignDistributor | N/A | 8 workers | Routes by `hash(categoryId) % 8` |
 
@@ -55,7 +54,7 @@ Each entity type uses a different shard key optimized for its access pattern:
 
 ### CampaignEntity
 - **Status enum**: `Active`, `Paused`
-- **Active**: Responds to bid requests, RL agent adjusts multiplier every 15 min
+- **Active**: Responds to bid requests with the campaign's CPM (no bid optimizer — quality-adjusted second-price clearing handles price discovery)
 - **Paused**: Stops responding, creatives removed from ServeIndex
 - **Budget exhausted**: Stops bidding, creatives **remain** in ServeIndex (budget resets daily)
 - **Day reset guard**: `lastRolledEpochDay` prevents double-roll on same calendar day

@@ -18,23 +18,23 @@ Promovolve's fair selection algorithm guarantees per-campaign diversity (one cre
 ### The Scoring Formula
 
 ```
-score = sampledCTR × log(1 + CPM)
+score = sampledCTR × CPM^α
 ```
 
-Where `sampledCTR` is drawn from `Beta(clicks + 1, non_clicks + 1)` using time-bucketed statistics (1-minute granularity, 60-minute rolling window).
+Where `sampledCTR` is drawn from `Beta(clicks + 1, non_clicks + 1)` using time-bucketed statistics (1-minute granularity, 60-minute rolling window). The exponent **α (`bidWeight`)** is publisher-configurable: α=0.3 (Discovery) lets quality dominate, α=0.5 (Balanced) is the default `sqrt(CPM)`, α=0.7 (Revenue) tilts toward higher bids.
 
 ### Exploration in Action
 
 ```
-Slot candidates after fair selection:
+Slot candidates after fair selection (α=0.5):
   Campaign A: CPM $5.00, Beta(6, 146)    → sample: 0.032
   Campaign B: CPM $4.20, Beta(3, 19)     → sample: 0.091
   Campaign C: CPM $3.80, Beta(1, 1)      → sample: 0.647
 
 Scores:
-  A: 0.032 × log(6.00) = 0.032 × 1.79 = 0.057
-  B: 0.091 × log(5.20) = 0.091 × 1.65 = 0.150
-  C: 0.647 × log(4.80) = 0.647 × 1.57 = 1.016
+  A: 0.032 × √5.00 = 0.032 × 2.236 = 0.0716
+  B: 0.091 × √4.20 = 0.091 × 2.049 = 0.1865
+  C: 0.647 × √3.80 = 0.647 × 1.949 = 1.261
 
 → C wins (exploration of unknown creative)
 ```

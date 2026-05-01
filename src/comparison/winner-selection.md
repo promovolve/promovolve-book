@@ -51,7 +51,7 @@ The algorithm:
 When a user loads a page, Thompson Sampling selects among the shortlisted candidates. The scoring formula:
 
 ```
-score = sampledCTR × log(1 + CPM)
+score = sampledCTR × CPM^α
 ```
 
 Where `sampledCTR` is drawn from a Beta distribution based on observed performance over a 60-minute rolling window:
@@ -60,27 +60,47 @@ Where `sampledCTR` is drawn from a Beta distribution based on observed performan
 sampledCTR ~ Beta(clicks + 1, impressions - clicks + 1)
 ```
 
-The `log(1 + CPM)` term gives higher bids an advantage, but with **diminishing returns**: a $10 CPM is only 3.5x better than a $1 CPM (not 10x). This means CTR dominates — a creative that readers actually click beats one that merely bids high.
+The exponent **α (`bidWeight`) is publisher-configurable** and controls how aggressively price competes with quality:
+
+| α    | Profile     | Effect                                         |
+|------|-------------|------------------------------------------------|
+| 0.3  | Discovery   | Quality dominates; small advertisers compete   |
+| 0.5  | Balanced    | `sqrt(CPM)` — the default                     |
+| 0.7  | Revenue     | Higher bids win more often                     |
+
+At α=0.5 a $10 CPM is only ~3.2× better than a $1 CPM (not 10×). CTR is the multiplicative factor: a creative that readers actually click beats one that merely bids high.
 
 ### A worked example
 
-Three campaigns competing for the same slot. Campaign C is brand new with no data:
+Three campaigns competing for the same slot at the default α=0.5. Campaign C is brand new with no data:
 
 ```
 Campaign A: $5.00 CPM, 150 impressions, 5 clicks
   Beta(6, 146) → sample: 0.032
-  score = 0.032 × log(6.00) = 0.057
+  score = 0.032 × √5.00 = 0.0716
 
 Campaign B: $4.20 CPM, 22 impressions, 3 clicks
   Beta(4, 20) → sample: 0.091
-  score = 0.091 × log(5.20) = 0.150
+  score = 0.091 × √4.20 = 0.1865
 
 Campaign C: $3.80 CPM, 0 impressions, 0 clicks
   Beta(1, 1) → sample: 0.647  (uniform — could be anything)
-  score = 0.647 × log(4.80) = 1.016  ← wins (exploration)
+  score = 0.647 × √3.80 = 1.261  ← wins (exploration)
 ```
 
 Campaign C wins this request despite having the lowest CPM and no track record. This is **exploration** — the system gives the new creative a chance to prove itself. Over the next few dozen impressions, if C's true CTR turns out to be low, its Beta distribution narrows and it stops winning. If C turns out to be genuinely good, it earns a stable share of impressions.
+
+### Pricing: quality-adjusted second-price
+
+The exploiting winner doesn't pay its own bid. The selector records the next-best loser's score, then computes the **minimum CPM at which the winner's score still beats that runner-up given its sampled CTR**:
+
+```
+clearingCPM = (bestLoserScore / sampledCTR_winner) ^ (1/α)
+```
+
+Clamped to the site floor and to the winner's actual bid. A creative that earns a high sampled CTR therefore pays less than one that merely outbid; a creative bidding well above the runner-up gets the price compressed back toward what would have actually been needed to win. There is no upside to bid shading, so Promovolve runs no campaign-side bid optimizer at all.
+
+Cold-start serves clear at the floor. Pinned re-encounters (see below) bypass clearing entirely — they're free.
 
 A traditional exchange would never serve Campaign C. It would never get data. It would never have a chance.
 
@@ -103,12 +123,17 @@ Thompson Sampling doesn't run in isolation. It's one step in a pipeline, and its
 
 ```
 1. ServeIndex lookup     → fetch cached candidates from local DData replica
-2. Content recency       → drop candidates if page content is stale (> 48h)
-3. Frequency cap         → drop candidates the user has seen too many times
-4. Pacing gate           → probabilistic throttle based on aggregate budget utilization
-5. Thompson Sampling     → score and select among remaining candidates
-6. Budget reservation    → reserve spend with the selected campaign
+2. Pin-honor check       → if the slot carries a dog-ear pin and the pinned
+                           creative is still in the pool, bypass everything
+                           below and serve the pin (free re-encounter)
+3. Content recency       → drop candidates if page content is stale (> 48h)
+4. Frequency cap         → drop candidates the user has seen too many times
+5. Pacing gate           → probabilistic throttle based on aggregate budget utilization
+6. Thompson Sampling     → score and select among remaining candidates
+7. Budget reservation    → reserve spend with the selected campaign
 ```
+
+**Why pin-honoring runs first:** A dog-ear is the reader saying "I want to come back to this ad." Subjecting the pin to pacing gates or frequency caps would let throttling discard a bookmark the reader explicitly asked for. Pinned slots also skip CPM reservation — the re-encounter is treated as a free engagement signal, not a billable serve.
 
 **Why pacing runs before Thompson Sampling:** If pacing ran after selection, Thompson Sampling would pick a creative, then pacing would sometimes throw it away. That wastes an exploration opportunity — we showed nothing, we learned nothing. By putting the pacing gate first, every request that makes it to Thompson Sampling produces a served impression and useful data.
 
@@ -129,13 +154,15 @@ In a traditional exchange, if the winner can't pay, the auction fails and the sl
 
 | Dimension | Traditional (Highest Bid) | Promovolve (Thompson Sampling) |
 |-----------|--------------------------|-------------------------------|
-| **Selection criterion** | Price only | CTR × log-compressed price |
+| **Selection criterion** | Price only | `sampledCTR × CPM^α` (α publisher-tunable) |
 | **Number of candidates** | 1 winner | Multiple shortlisted per slot |
+| **Pricing** | Second-price on bids | Quality-adjusted second-price — winner pays the minimum CPM that still beats the runner-up given its CTR |
+| **Reader agency** | None — readers can't influence what they see | Dog-ear pins: readers bookmark ads they want to revisit |
 | **Learning** | None — each auction is independent | Continuous — every impression updates the Beta posterior |
 | **New creative discovery** | Impossible without outbidding the incumbent | Built-in via exploration; 30% forced exploration for brand-new creatives |
 | **Cold start** | New advertiser must bid high to win | Round-robin warmup guarantees initial data collection |
 | **Failure handling** | Slot goes unfilled | Fall through to next-best candidate |
-| **Publisher alignment** | Optimizes for advertiser spend | Optimizes for reader engagement (CTR), weighted by spend |
+| **Publisher alignment** | Optimizes for advertiser spend | Optimizes for reader engagement (CTR), weighted by spend via α |
 | **Short-term revenue** | Higher (always picks highest bid) | Sometimes lower (explores lower-CPM creatives) |
 | **Long-term revenue** | Stagnant (no learning) | Higher (discovers high-CTR creatives that earn more clicks) |
 | **Advertiser ROI** | Favors large budgets | Favors creative quality — a good ad at $3 CPM can beat a bad ad at $8 CPM |

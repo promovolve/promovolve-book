@@ -56,19 +56,39 @@ LLMs changed this. A single API call to Gemini Flash costs a fraction of a cent 
 
 ## What Promovolve Does Differently
 
-Promovolve rebuilds ad serving from the publisher's perspective, using content as the sole targeting signal.
+Most ad-tech projects keep the same ad format — a fixed-size IAB rectangle delivered through real-time bidding — and try to fix the parts around it: better targeting, faster auctions, friendlier consent flows. Promovolve takes a different bet. It changes the format itself, then rebuilds the rest of the stack to fit.
+
+### The ad isn't a rectangle. It's a magazine spread.
+
+A Promovolve creative isn't a static banner. It's a small magazine — a sequence of pages a reader can expand into a full-screen overlay, swipe through, and collapse again. The collapsed view sits unobtrusively in the publisher's slot like a magazine ad on a page. Tapped, it opens into editorial-style content: cover, story pages, a call to action.
+
+This is closer to how print advertising worked. The reader chooses to engage. The advertiser gets attention when it's wanted, not interruption when it isn't. And because the format is a container — not a fixed pixel size — a single creative can render in any slot the publisher offers.
+
+### Readers can dog-ear an ad
+
+Pick up a magazine, fold the corner of an interesting page, come back to it later. Promovolve gives readers the same affordance for ads. A reader who finds a creative interesting can fold its corner — a literal dog-ear — and the next time they land on a page where that advertiser is eligible, the ad they bookmarked is the one they see. The pin lives in the reader's browser, not in a server-side profile.
+
+Nothing in traditional ad tech does this. Bookmarks are something you do for content you care about, and ads have never been treated as content readers might want to keep. The dog-ear is a bet that some ads are worth coming back to, and that letting readers say so out loud is a better signal than retargeting them with the same creative for the next thirty days.
+
+### Creatives flow to fit the slot
+
+Traditional creatives are pinned to IAB pixel dimensions: 300×250, 728×90, 970×250. Mismatched slots get letterboxing, scaling artifacts, or no fill at all. Promovolve creatives are fluid — the same content reflows to fit whatever rectangle the publisher provides. Advertisers upload a landing page or a structured creative once; Promovolve's pipeline (Playwright extraction, Gemini rewriting, the in-house designer) renders it into the slot's geometry on demand.
 
 ### Auctions happen before users arrive
 
-Traditional systems run an auction on every page load because they need to evaluate the user in real time. Promovolve doesn't need to — the content doesn't change between page loads. So the auction runs when content is published or updated (via scheduled crawl), and the results are cached in a replicated in-memory index. When a user arrives, the ad is already chosen. Serve latency drops from 50-200ms to under 1ms.
+Traditional systems run an auction on every page load because they need to evaluate the user in real time. Promovolve doesn't need to — the content doesn't change between page loads. So the auction runs when content is published or updated (via scheduled crawl), and the results are cached in a replicated in-memory index. When a user arrives, the ad is already chosen. Serve latency drops from 50–200ms to under 1ms.
 
 ### Multiple candidates, not a single winner
 
 Instead of picking one winner per auction, Promovolve shortlists multiple candidates per ad slot and caches them all. At serve time, Thompson Sampling selects among them, balancing exploration (trying new creatives to learn their click-through rate) against exploitation (serving the creative that performs best). The system continuously learns which ads work best on which content, without A/B test infrastructure or manual optimization.
 
-### Each campaign learns to bid
+### Quality-adjusted auctions reward good creatives
 
-A per-campaign reinforcement learning agent (Double DQN) observes its own performance metrics every 15 minutes — click-through rate, win rate, budget utilization, pacing — and adjusts its bid multiplier. Over days, each campaign learns its own bidding strategy: aggressive campaigns that convert well bid higher; campaigns burning budget too fast learn to pull back. No manual bid management required.
+Bidding the highest CPM doesn't automatically win the slot. Promovolve scores each candidate as `sampled_CTR × CPM^α`, where α is a publisher-tunable weight. A creative that earns clicks can outscore a higher-bidding one that doesn't, and the publisher controls how heavily quality counts versus price. Pricing is quality-adjusted too: an exploiting winner pays the minimum bid that would still have won given its CTR, not its own bid — so there's no incentive to shade.
+
+### Publisher-side learning, not advertiser-side bid wars
+
+Promovolve has no campaign-side reinforcement learning agent. With second-price quality-adjusted auctions, bid shading is counterproductive — there's nothing for an RL agent to learn that the auction mechanism doesn't already enforce. The reinforcement learning that does exist runs on the publisher side: a per-site agent tunes the floor CPM upward when bid spread suggests the market can bear it, and downward when fill suffers. The publisher's revenue improves; advertisers see honest second-price clearing.
 
 ### Budget pacing adapts to reality
 
@@ -76,7 +96,7 @@ A PI controller with self-tuning gains, traffic shape learning, and oscillation 
 
 ### No user tracking — because it's not needed
 
-Promovolve stores no user profiles, sets no tracking cookies, and collects no cross-site identifiers. Targeting is based entirely on the content of the page being viewed. This isn't a sacrifice for privacy compliance — it's a consequence of the design. When you match ads to content, there's nothing about the user you need to know. The content tells you everything.
+Promovolve stores no user profiles, sets no tracking cookies, and collects no cross-site identifiers. Targeting is based entirely on the content of the page being viewed. This isn't a sacrifice for privacy compliance — it's a consequence of the design. When you match ads to content, there's nothing about the user you need to know. The content tells you everything. Even the dog-ear lives in the reader's own browser; the server only learns "someone saved this creative," never who.
 
 ## Who Promovolve Is For
 
@@ -102,7 +122,7 @@ Promovolve lowers the bar to zero. An advertiser is anyone with an image and a l
 - A **small hotel in Kyoto** reaching readers of a travel article about their neighborhood
 - A **global brand** running a campaign across a network of niche publishers
 
-There's no DSP to integrate with. No bid strategy to configure manually — the RL agent learns the right price. No user profiles to buy. Just: "here's my ad, here's my budget, here's what my product is." The advertiser picks an ad product category (e.g., "Travel" or "Kitchen Equipment"), and the system automatically derives which content categories match — using the official IAB mapping between Ad Product Taxonomy 2.0 and Content Taxonomy 2.1. The system handles the rest.
+There's no DSP to integrate with. No bid strategy to configure manually — the second-price auction handles price discovery, and quality-adjusted scoring rewards creatives readers actually engage with. No user profiles to buy. Just: "here's my ad, here's my budget, here's what my product is." The advertiser picks an ad product category (e.g., "Travel" or "Kitchen Equipment"), and the system automatically derives which content categories match — using the official IAB mapping between Ad Product Taxonomy 2.0 and Content Taxonomy 2.1. The system handles the rest.
 
 This is how magazine advertising worked. A local restaurant could buy a quarter-page in a neighborhood magazine. The scale matched the business. Promovolve brings that accessibility to the web.
 
@@ -112,17 +132,16 @@ Advertising agencies don't own publisher platforms — they manage campaigns on 
 
 With Promovolve, agencies can own the ad-serving infrastructure itself. An agency can run its own Promovolve instance, build a network of publisher relationships, and manage all of their clients' campaigns through a system they control end-to-end. No DSP middleman. No exchange fees. No dependency on someone else's platform. The agency becomes the platform.
 
-The RL agent handles bid optimization per campaign, so agencies spend their time on strategy and creative rather than manual bid tuning. It's closer to the magazine ad sales model agencies grew up with — pick the publications, choose the placements, manage client budgets — except now the agency owns the technology that makes it all work.
+The auction is second-price and quality-adjusted, so there's nothing to bid-optimize against. Agencies spend their time on strategy and creative — picking the publications, choosing the placements, managing client budgets — instead of feeding a bid-management tool. It's closer to the magazine ad sales model agencies grew up with, except now the agency owns the technology that makes it all work.
 
 ## How This Book Is Organized
 
 The rest of this book documents every algorithmic detail, derived from the source code:
 
 - **Architecture** — Pekko cluster topology, entity hierarchy, and data flow
-- **Auction** — The five phases of the periodic batch auction
-- **Serving** — Thompson Sampling, cold start, and fair selection at serve time
+- **Auction** — The five phases of the periodic batch auction, plus quality-adjusted scoring and pricing
+- **Serving** — Thompson Sampling, cold start, fair selection, and dog-ear pin-honoring at serve time
 - **Pacing** — PI control, self-tuning, traffic shape learning
-- **RL** — The DQN agent's state space, reward function, and training loop
 - **Distributed State** — ServeIndex replication and consistency
 - **Comparison** — Point-by-point mapping against traditional SSP/DSP/exchange patterns
 

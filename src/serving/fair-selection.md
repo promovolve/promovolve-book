@@ -34,7 +34,7 @@ From the AdServer source code, the exact order of operations:
 
 6. Thompson Sampling Selection
    → Cold start strategy selection (full cold / warmup / partial / standard)
-   → Score: sampledCTR × log(1 + CPM)
+   → Score: sampledCTR × CPM^α
    → Select argmax
 
 7. Budget Reservation

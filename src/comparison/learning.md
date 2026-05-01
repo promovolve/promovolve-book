@@ -1,6 +1,6 @@
 # Learning Mechanisms
 
-Both traditional ad tech and Promovolve learn from feedback, but at different levels and timescales.
+Both traditional ad tech and Promovolve learn from feedback, but at different levels and timescales. The fundamental difference: traditional RTB learns about **users**, Promovolve learns about **content** and **creatives**.
 
 ## Traditional: RTB Feedback Loops
 
@@ -16,7 +16,9 @@ Both traditional ad tech and Promovolve learn from feedback, but at different le
 - No exploration: only learns from wins, never discovers if alternative creatives would perform better
 - User-dependent: requires cookies, profiles, cross-site tracking
 
-## Promovolve: Three-Layer Learning
+## Promovolve: Five-Layer Learning
+
+Promovolve does not run any campaign-side bid optimizer. With quality-adjusted second-price clearing (see [Winner Selection](./winner-selection.md)), bid shading is counterproductive — the auction mechanism already extracts honest bids. The learning that does happen runs on the publisher and content sides.
 
 ### Layer 1: Thompson Sampling (Per-Request)
 
@@ -31,17 +33,15 @@ User clicks:       Beta(6, 95)  → mean 5.9%
 
 This is the fastest loop — sub-second feedback incorporated into the next serve decision.
 
-### Layer 2: DQN Bid Optimization (Every 15 Minutes)
+### Layer 2: Publisher-Side Floor CPM RL (Per-Site, Slow)
 
-**What**: Optimal bid multiplier given budget, pacing, and performance
-**Timescale**: 15-minute observation windows, convergence over ~8 days
-**How**: Double DQN with 8-dim state, 5 actions, click reward - overspend penalty
+**What**: The minimum CPM the publisher will accept on a given site
+**Timescale**: Adjustments evaluated against rolling served revenue
+**How**: An RL agent observes bid spread, fill rate, and post-pacing served revenue, and tunes the floor up when the market shows headroom (bid spread > 1.5×) and down when fill suffers
 
-```
-State → Q-network → action → bidMultiplier adjustment
-```
+The agent is **gated**: it only activates when bid spread is wide enough that floor adjustments can plausibly change outcomes. In a homogeneous market where every bidder offers the same CPM, the agent stays put — moving the floor would just collapse fill without raising revenue.
 
-Medium timescale, learning competitive dynamics and pacing patterns.
+This is the only RL agent in the system. It runs on behalf of the publisher; advertisers see honest second-price clearing regardless of what the floor does.
 
 ### Layer 3: Category Ranking (Per Auction)
 
@@ -55,7 +55,7 @@ Category "sports" on site X:
   After data: Beta(15, 95) → weight sampled ~0.14
 ```
 
-Slowest loop, learning site-level category affinities.
+Slow loop, learning site-level category affinities.
 
 ### Layer 4: Traffic Shape (Per Day)
 
@@ -69,16 +69,21 @@ Adjusts pacing targets to match actual traffic distribution.
 
 **What**: Optimal aggressiveness for overpace correction
 **Timescale**: Every 20 samples, min 500ms interval
-**How**: Overpace multiplier adapts between 1.5x and 5.0x based on persistent overspend detection
+**How**: Overpace multiplier adapts between 1.5× and 5.0× based on persistent overspend detection
+
+## Reader-Driven Signals (Not Learning, But Adjacent)
+
+Promovolve also accepts an explicit signal from the reader: the **dog-ear**. When a reader folds the corner of a creative, the pin lives in their browser and re-encounters of that advertiser surface the bookmarked creative. This isn't a learning loop in the statistical sense — it's a direct reader vote, more reliable than any inferred preference. See [Why Promovolve?](../why-promovolve.md#readers-can-dog-ear-an-ad).
 
 ## Comparison
 
 | Dimension | Traditional RTB | Promovolve |
 |-----------|----------------|------------|
-| What's optimized | Bid price | Creative + bid + category + pacing |
+| What's optimized | Bid price | Creative + category + pacing + floor |
 | Exploration | None | Built-in (Thompson Sampling) |
-| Learning layers | 1 (bid-level) | 5 (per-request through daily) |
+| Learning layers | 1 (bid-level) | 5 (per-request through publisher-side floor RL) |
 | User targeting | Yes (profile) | No (content-based) |
+| Reader signal | None | Dog-ear pin (explicit bookmark) |
 | Privacy impact | High (tracking) | Low (no user profiles) |
 | Cold start | Historical bid data | Bayesian priors + round-robin warmup |
-| Adaptability | Real-time bids | RL converges over days, TS adapts per-request |
+| Adaptability | Real-time bids | TS adapts per-request; floor RL converges over days |

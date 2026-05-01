@@ -60,17 +60,6 @@
   - [Traffic Shape Learning](./pacing/traffic-shape.md)
   - [Grace Periods & Hybrid Modes](./pacing/grace-periods.md)
 
-## Reinforcement Learning
-
-- [Reinforcement Learning from Scratch](./rl/from-scratch.md)
-- [DQN Agent Overview](./rl/overview.md)
-  - [State Space](./rl/state-space.md)
-  - [Action Space](./rl/action-space.md)
-  - [Reward Function](./rl/reward-function.md)
-  - [Double DQN Architecture](./rl/double-dqn.md)
-  - [Training Loop & Hyperparameters](./rl/training.md)
-  - [A Week of Learning](./rl/simulation-results.md)
-
 ## Distributed State
 
 - [Distributed State from Scratch](./distributed/from-scratch.md)
@@ -79,23 +68,10 @@
   - [TTL Sweep & Expiration](./distributed/ttl-sweep.md)
   - [Write Consistency Levels](./distributed/consistency.md)
 
-## Learning RL Through Ad Bidding
-
-- [Learning Reinforcement Learning Through Ad Bidding](./rl-tutorial/index.md)
-  - [The Problem: Why Bid Optimization Needs RL](./rl-tutorial/01-the-problem.md)
-  - [RL Fundamentals: Agent, Environment, Reward](./rl-tutorial/02-fundamentals.md)
-  - [Building a Neural Network From Scratch](./rl-tutorial/03-neural-network.md)
-  - [From Q-Tables to Deep Q-Networks](./rl-tutorial/04-dqn.md)
-  - [Experience Replay: Learning From the Past](./rl-tutorial/05-replay-buffer.md)
-  - [Double DQN: Fixing Overestimation](./rl-tutorial/06-double-dqn.md)
-  - [Putting It Together: The BidOptimizationAgent](./rl-tutorial/07-full-agent.md)
-  - [Training in Production](./rl-tutorial/08-production.md)
-
 ## Comparison with Traditional Ad Tech
 
 - [Promovolve vs SSP/DSP/Exchange](./comparison/vs-traditional.md)
   - [Auction Timing: Periodic vs Realtime](./comparison/auction-timing.md)
   - [Winner Selection: MAB vs Highest Bid](./comparison/winner-selection.md)
-  - [Price Discovery & First-Price Model](./comparison/price-discovery.md)
   - [Learning Mechanisms](./comparison/learning.md)
   - [Key Innovations](./comparison/innovations.md)

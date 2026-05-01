@@ -28,7 +28,7 @@ graph LR
 ```
 
 1. **Crawler** periodically fetches publisher pages and sends them to an LLM (Gemini Flash) for content classification into IAB taxonomy categories.
-2. **AuctioneerEntity** — one per site, sharded across the Pekko cluster — runs a batch auction. It collects bids from all campaigns whose target categories match the page content, applies RL-adjusted bid multipliers and pacing throttles, and shortlists multiple candidates per ad slot (not just a single winner).
+2. **AuctioneerEntity** — one per site, sharded across the Pekko cluster — runs a batch auction. It collects bids from all campaigns whose target categories match the page content, applies pacing throttles, and shortlists multiple candidates per ad slot (not just a single winner). Bids are honest CPMs; quality-adjusted second-price clearing at serve time means there's no upside to bid shading, so no campaign-side bid optimizer is needed.
 3. **ServeIndex** — a replicated in-memory cache built on Pekko Distributed Data (DData) — stores the shortlisted candidates. Every node in the cluster holds a local replica, so no remote call is needed at serve time.
 
 This phase re-runs on a schedule (every 5 minutes by default) and whenever content changes, keeping candidates fresh without waiting for a user to arrive.
@@ -57,27 +57,31 @@ The result: serve latency under 1ms, with no user data collected, no cookies set
 | Traditional role | Promovolve equivalent |
 |---|---|
 | SSP (supply-side platform) | Crawler + AuctioneerEntity — the publisher's inventory is discovered by crawling, not by firing bid requests |
-| Exchange (auction house) | AuctioneerEntity — runs the auction offline, ahead of user traffic |
-| DSP (demand-side platform) | Campaign entities + DQN RL agent — advertisers' bid strategies are learned automatically, not configured in a separate system |
+| Exchange (auction house) | AuctioneerEntity + Thompson Sampling at serve time — quality-adjusted second-price clearing |
+| DSP (demand-side platform) | Campaign entities — advertisers post a CPM and the auction extracts honest bids; no separate bid-management system |
 | Ad server | API Node + local DData replica — serves pre-computed results from memory |
 | DMP (data management platform) | Not needed — targeting is content-based, not user-based |
+| Creative-production pipeline | LP-to-creative pipeline — Playwright extraction + Gemini rewriting + in-house designer renders fluid creatives that flow to fit the slot |
+| Retargeting | Dog-ear pin — reader-driven bookmark stored in the reader's own browser, not a server-side profile |
 
 ## Summary Comparison
 
 | Aspect | Traditional SSP/DSP | Promovolve |
 |--------|-------------------|------------|
+| Ad format | Static IAB rectangles (300×250, 728×90, …) | Expandable, multi-page magazine creatives that flow to fit the slot |
+| Reader agency | None | Dog-ear pin — reader bookmarks an ad to revisit |
 | Auction timing | Per-request (realtime) | Per-crawl + 5-min re-auction |
-| Serve latency | 50-200ms | < 1ms |
+| Serve latency | 50–200ms | < 1ms |
 | Winner selection | Highest bid wins | Fair selection → Thompson Sampling |
-| Price model | Second-price (GSP) | First-price, RL-adjusted CPM |
-| Price discovery | Yes (competitive) | No (RL optimizes pacing) |
-| Learning | RTB feedback loops | TS + DQN RL + category ranking |
+| Price model | Second-price (GSP) on bids only | Quality-adjusted second-price: `sampledCTR × CPM^α` |
+| Price discovery | Yes (competitive) | Yes (competitive, quality-adjusted) |
+| Learning | RTB feedback loops | TS + category ranking + traffic shape + publisher-side floor RL |
 | Candidate model | Single winner | Multi-candidate with diversity |
 | Budget control | Per-campaign throttling | Aggregate PI-controlled pacing |
 | State persistence | Database/Redis | DData (replicated in-memory) |
 | Content scope | Any page, any time | Recency only (< 48h) |
 | Targeting | User profiles, cookies | Content classification (LLM) |
 | Failure mode | No ad shown | Serve cached candidates |
-| Privacy | User tracking required | No user profiles |
+| Privacy | User tracking required | No user profiles; even pins live in the reader's browser |
 
 The following sub-chapters explore each difference in detail.

@@ -19,12 +19,12 @@ For each candidate c in the slot:
     β = impressions - clicks + 1
     sampledCTR = sampleBeta(α, β)
 
-  score = sampledCTR × log(1 + CPM)
+  score = sampledCTR × CPM^α
 
 Select candidate with highest score
 ```
 
-The `log(1 + CPM)` factor ensures bid price matters with diminishing returns — a $10 CPM is not 10x better than a $1 CPM.
+The `CPM^α` factor ensures bid price matters with diminishing returns. The exponent α (`bidWeight`) is publisher-configurable: at the default α=0.5, a $10 CPM is only ~3.2× better than a $1 CPM (not 10×). See [Scoring Formula](./scoring-formula.md) for the full publisher dial.
 
 ## Time-Bucketed Statistics
 
@@ -64,6 +64,6 @@ This ordering is critical — the pacing gate decides whether to serve **at all*
 ## Sub-chapters
 
 - [Beta-Bernoulli Model](./beta-bernoulli.md) — the probabilistic model behind Thompson Sampling
-- [Scoring Formula](./scoring-formula.md) — why `sampledCTR × log(1 + CPM)` and not alternatives
+- [Scoring Formula](./scoring-formula.md) — why `sampledCTR × CPM^α` and the publisher's α dial
 - [Cold Start Strategies](./cold-start.md) — handling candidates with zero or few impressions
 - [Beta Distribution Sampling](./beta-sampling.md) — the Marsaglia-Tsang method used in production

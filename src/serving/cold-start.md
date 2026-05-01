@@ -10,7 +10,7 @@ New candidates enter the system with zero impressions. Promovolve uses three dis
 
 ```
 sampledCTR = categoryScore + random(-0.1, +0.1)
-score = sampledCTR × log(1 + CPM)
+score = sampledCTR × CPM^α
 ```
 
 The `categoryScore = classifierConfidence × rankerWeight` provides a signal from the TaxonomyRankerEntity. The ±0.1 noise ensures different candidates are selected across requests even when they have identical category scores.
