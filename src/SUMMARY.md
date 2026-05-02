@@ -37,6 +37,7 @@
   - [Phase 3: Bid Collection](./auction/bid-collection.md)
   - [Phase 4: Candidate Shortlisting](./auction/candidate-shortlisting.md)
   - [Phase 5: ServeIndex Caching](./auction/serve-index-caching.md)
+- [Quality-Adjusted Pricing](./auction/quality-adjusted-pricing.md)
 - [Re-Auction & Event Triggers](./auction/re-auction.md)
 - [Why Multi-Candidate?](./auction/why-multi-candidate.md)
 
