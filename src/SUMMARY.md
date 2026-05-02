@@ -17,6 +17,10 @@
 - [Technical Introduction](./introduction.md)
 - [How Ad Tech Works (and Where Promovolve Diverges)](./comparison/from-scratch.md)
 
+# The Ad Format
+
+- [The Magazine Format](./format/overview.md)
+
 # Deep Dives
 
 ## Architecture
