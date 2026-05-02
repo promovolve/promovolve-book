@@ -2,25 +2,37 @@
 
 Seven days have passed. Let's see what the system has learned.
 
-## Takeshi's RL Agent Has a Strategy
+## Takeshi's Effective CPM Has Drifted Down
 
-On day 1, the agent's epsilon was 0.92 — nearly every action was random. By day 7, epsilon has decayed to about 0.15. The agent is now 85% exploitation, 15% exploration.
+Takeshi's max CPM is still $5 — he hasn't touched it. He's never going to touch it; there's nothing to touch. But his *effective* CPM, what he actually pays per won impression, has been dropping all week.
 
-Its learned policy, visible in the Q-values:
+The reason is the auction itself. Quality-adjusted second-price clearing computes the winner's payment as the minimum CPM that would still beat the runner-up given its sampled CTR:
 
-**When budget is above 60% and it's before noon**: Bid aggressively (action 4: multiply by 1.2×). Morning traffic on Yuki's site has high CTR for travel content. Winning these impressions is worth paying more.
+```
+clearingCPM = (bestLoserScore / sampledCTR_winner) ^ (1/α)
+```
 
-**When budget is below 30% with time remaining**: Pull back (action 0: multiply by 0.8×). Conserve what's left. Spreading thin across the afternoon produces more total clicks than burning out early.
+As Takeshi's `Beta(15, 299)` distribution narrowed around 4.8% CTR, his `sampledCTR_winner` settled higher than most competitors. Higher CTR → lower clearing CPM. By day 7, Takeshi's eCPM is around $3.40 — well under his $5 max. He's getting a 32% quality discount, automatic, with no agent in the loop.
 
-**When CTR is high and spend rate is normal**: Hold (action 2: multiply by 1.0×). Things are working. Don't change what isn't broken.
+The JR Rail Pass campaign tells the opposite story. Its $8 max bid would dominate a pure first-price auction, but with a 3.1% CTR competing against Takeshi's 4.8%, its effective CPM stays close to its bid — the auction has nothing to discount. It still wins many slots (its raw CPM is high enough to overcome the CTR gap), but it pays for them.
 
-**When overpacing (spend rate above 1.5×)**: Reduce immediately (action 0 or 1). The overspend penalty in the reward function trained this response. The agent learned that overpacing leads to negative rewards.
+This is what replaces a campaign-side bid optimizer. The auction itself extracts honest bids and rewards quality. There's nothing for an RL agent to learn here — bid shading would just lose impressions, and the right price for any given impression depends on the runner-up, which the campaign can't observe in advance anyway.
 
-None of these rules were programmed. They emerged from the reward signal — clicks minus overspend penalty — and thousands of training steps on the replay buffer.
+## A Few Readers Have Dog-Eared the Ad
 
-Meanwhile, the JR Rail Pass agent learned a different strategy. With a higher CPM ($8) and a larger budget, it can afford to bid aggressively in the morning and let pacing handle the afternoon. Its multiplier swings more widely: up to 1.4 in morning peaks, down to 0.7 in the evening. It learned that its high base CPM means it wins most auctions even at 0.7×.
+The dashboard projection has been counting fold events:
 
-Different campaigns, different budgets, different learned strategies. Each agent adapts to its own situation.
+```
+Takeshi's ryokan-magazine-001:
+  Folds this week:  9
+  Pin re-encounters: 4 (so far)
+```
+
+Nine readers have folded the corner of Takeshi's creative this week. Four of them have already returned to a page where Takeshi was eligible — and instead of the auction running, the ad they bookmarked was the one served. Those re-encounters bypass CPM clearing (free), bypass pacing throttle (a bookmark is a reader's choice, not a billable serve), and don't count against the daily budget.
+
+For Takeshi, this is a quietly powerful effect. Nine reader-driven bookmarks in a week is more loyalty than a typical retargeting campaign produces, and he didn't pay for the re-encounters. The pins live in the readers' own browsers; the server doesn't know who they are, only that *someone* with that browser folded that creative.
+
+In a few months, when one of those readers actually plans an autumn trip and lands on a Hakone article, Takeshi's ryokan will be the ad they see. The bookmark is doing the work that retargeting tries to do, without the surveillance.
 
 ## Thompson Sampling Has Converged
 
@@ -33,7 +45,7 @@ After hundreds of impressions, the creative stats tell a clear story:
 | Hiking Gear Co | 89 | 1 | Beta(2, 89) | 2.2% |
 | Pottery Workshop | 45 | 3 | Beta(4, 43) | 8.5% |
 
-Takeshi's ryokan gets the most impressions — it has a proven CTR and a decent CPM. JR Rail Pass has a higher CPM but lower CTR; the scoring formula `sampledCTR × log(1 + CPM)` keeps them competitive but Takeshi's CTR advantage matters.
+Takeshi's ryokan gets the most impressions — it has a proven CTR and a decent CPM. JR Rail Pass has a higher CPM but lower CTR; the scoring formula `sampledCTR × CPM^α` (publisher α=0.5) keeps them competitive but Takeshi's CTR advantage matters — and translates directly into a lower clearing price for him.
 
 The pottery workshop is interesting. It has fewer impressions (it started later in the week) but its CTR is the highest — 8.5%. Its `Beta(4, 43)` distribution is still fairly wide, though. Thompson Sampling is giving it more exploration to confirm whether this high CTR is real or noise.
 
@@ -77,7 +89,7 @@ The PI controller uses this shape instead of a linear time fraction. At 10am, it
 
 The PI controller has been adjusting itself:
 
-- **Overpace multiplier**: Started at 2.0×. After detecting that Takeshi's campaign occasionally overpaced by 20% in the morning (the RL agent bidding up), it increased to 2.8×. This means the controller responds more aggressively to overspending — a correction learned from experience.
+- **Overpace multiplier**: Started at 2.0×. After detecting that JR Rail Pass occasionally overpaced by 20% in the morning (its $8 CPM combined with peak traffic kept burning through budget faster than the linear target), it increased to 2.8×. This means the controller responds more aggressively to overspending — a correction learned from experience.
 
 - **Spend ratio smoothing**: The adaptive EMA alpha settled at 0.25. The traffic on Yuki's site is moderately volatile (it spikes when she publishes a new article and posts to social media). The controller learned to smooth more than the default to avoid overreacting to these spikes.
 
@@ -113,14 +125,26 @@ Fourteen people clicked through to his ryokan's booking page from a travel blog 
 
 He increases his daily budget to $30.
 
+## The Floor Has Nudged Up
+
+Yuki hasn't touched her site's floor CPM all week — but it's not the same number it started at.
+
+The publisher-side floor RL agent has been watching the bid spread on Yuki's site. Most of the week, four campaigns have been competing for her slots at $3, $4, $5, and $8 — a wide enough spread (>1.5×) that floor adjustments can plausibly move outcomes without collapsing fill. The agent nudged the floor from $0.50 to $0.80 over five days. Fill stayed healthy; clearing prices on cold-start serves came in higher; Yuki's revenue ticked up about 6% on top of what the auction itself was earning her.
+
+If the spread had been narrow — every bidder offering the same CPM — the agent would have stayed put. Moving the floor in a homogeneous market just shrinks fill without raising prices. The agent is gated by exactly this signal.
+
+This is the only RL agent in the system, and it runs on the publisher's side. Advertisers see honest second-price clearing regardless of where the floor sits.
+
 ## The System Keeps Learning
 
-Day 8 begins. Epsilon decays to 0.05 — the RL agent's floor. From now on, 95% of actions follow the learned policy, 5% continue to explore. The agent isn't done learning — it will adapt to seasonal changes, new competitors, and traffic shifts — but the wild random exploration of the first week is over.
+Day 8 begins. The system has found its rhythm: a travel blog with relevant ads, a local ryokan reaching interested travelers, creative performance continuously sharpened by Thompson Sampling, budgets paced smoothly, the publisher's floor tuned to the actual bid spread, and a small but growing set of readers who have explicitly bookmarked the ads they want to come back to.
 
-The system has found its rhythm: a travel blog with relevant ads, a local ryokan reaching interested travelers, creative performance continuously optimized, budgets paced smoothly, all running on sub-millisecond serving with no user tracking.
+It isn't done learning. New advertisers will join. Yuki's traffic shape will shift with the seasons. Some readers will fold ads; others will block them; the dashboard will reflect both. The pottery workshop's `Beta(4, 43)` is still wide enough that next week could swing either way.
 
-This is what advertising looks like when you start with the content instead of the user.
+But notice what's *not* happening: nobody is tuning a bid multiplier. Takeshi isn't checking his "bid strategy." There's no auto-bidder cycling through state-action pairs in a Q-table. The auction itself extracts honest bids, the readers vote with their dog-ears, and the publisher's floor agent handles the one piece of price-side learning that's actually informative.
+
+This is what advertising looks like when you start with the content, the format, and the reader — instead of the user profile.
 
 ---
 
-*Technical deep dives: [RL Training Loop](../rl/training.md) · [State Space](../rl/state-space.md) · [Traffic Shape Learning](../pacing/traffic-shape.md) · [Key Innovations](../comparison/innovations.md)*
+*Technical deep dives: [Scoring Formula](../serving/scoring-formula.md) · [Traffic Shape Learning](../pacing/traffic-shape.md) · [Key Innovations](../comparison/innovations.md)*

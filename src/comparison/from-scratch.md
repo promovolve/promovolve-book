@@ -100,13 +100,13 @@ A traditional auction picks one winner: the highest bidder. That's it. If a new 
 
 Promovolve caches multiple candidates and uses Thompson Sampling to choose at serve time. A new creative with no track record gets explored — shown to some users to learn its click-through rate. If it performs well, it earns more impressions. If not, it fades out naturally. No A/B test configuration needed. The system learns automatically.
 
-### Instead of DSP bid algorithms → per-campaign RL agents
+### Instead of DSP bid algorithms → quality-adjusted second-price clearing
 
 In the traditional stack, each DSP runs sophisticated bid optimization across all its campaigns. The ryokan in Hakone doesn't have a DSP; it can't participate.
 
-In Promovolve, each campaign has its own RL agent (a small neural network with ~4,800 parameters) that learns to adjust bid levels based on performance. The ryokan sets a maximum CPM and a daily budget. The agent figures out the rest: bid aggressively when the campaign is pacing well, pull back when budget is running low, learn day-over-day which bid levels produce clicks.
+Promovolve replaces the bid optimizer with the auction mechanism itself. The ryokan sets a maximum CPM and a daily budget. At serve time, candidates are scored as `sampledCTR × CPM^α` and the winner pays the minimum CPM that still beats the runner-up given its CTR — a quality-adjusted second-price clearing. There's no upside to bid shading and nothing to optimize against, so Promovolve runs no campaign-side RL agent at all. A creative that earns clicks pays less than one that merely outbid; honest bids are the dominant strategy.
 
-No DSP integration. No bid management expertise. The agent handles it.
+No DSP integration. No bid management expertise. The auction handles it.
 
 ### Instead of per-impression database writes → buffered spend tracking
 
@@ -128,7 +128,7 @@ These trade-offs are real and worth understanding:
 
 **No user-level targeting.** If an advertiser specifically wants to reach "women aged 25-34 in Tokyo who recently searched for hotels," Promovolve can't help. It can reach "readers of content about hotels in Tokyo," which may overlap significantly, but it's a different kind of targeting.
 
-**No real-time price discovery.** Traditional exchanges reveal market-clearing prices through competitive bidding. Promovolve's first-price model with RL adjustment doesn't discover "what is this impression worth to the market?" — it discovers "what bid level maximizes my clicks within my budget?"
+**No real-time price discovery on every impression.** Traditional exchanges run a fresh competitive auction on every page load and reveal a market-clearing price for that exact moment. Promovolve runs the auction once per crawl (and on a 5-minute re-auction tick), so the clearing price reflects the market over a window, not the millisecond. The auction itself is competitive — quality-adjusted second-price clearing extracts honest bids — but it's batch, not realtime.
 
 **Stale auction results.** Traditional RTB reflects the state of the world right now. Promovolve's cached candidates can be up to 5 minutes old (the re-auction interval). A campaign that paused 2 minutes ago might still be served until the next re-auction.
 

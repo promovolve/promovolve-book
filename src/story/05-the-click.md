@@ -20,9 +20,9 @@ The TrackRoutes handler validates the click:
 
 All three pass. The click is legitimate. `204 No Content` — acknowledged.
 
-## Four Systems Learn from This Click
+## Three Systems Learn from This Click
 
-The `LearningEventLog` routes the click event to four different parts of the system, each learning at a different timescale.
+The `LearningEventLog` routes the click event to three different parts of the system, each learning at a different timescale.
 
 ### 1. TaxonomyRankerEntity — Category Ranking (Days)
 
@@ -52,23 +52,7 @@ After 20 more impressions and 1 more click, it'll be `Beta(3, 19)` — about 14%
 
 The stats use a 60-minute rolling window with 1-minute buckets. This creative's strong early performance will influence serving decisions for the next hour, then the data starts aging out and the system stays responsive to changes.
 
-### 3. CampaignEntity — RL Agent (15 Minutes)
-
-The click is recorded in the RL agent's window counter:
-
-```
-windowClicks: 0 → 1
-```
-
-This won't trigger any RL action immediately — the agent only observes every 15 minutes. But when the next `RLObserveTick` fires, this click will be part of the reward:
-
-```
-reward = windowClicks - overspendPenalty = 1 - 0 = 1.0
-```
-
-A positive reward. The agent will store the transition: "I was in state S (full budget, morning, 1.0 multiplier), I chose to hold my bid (action 2), and I got reward 1.0." Over hundreds of these transitions, the agent learns which states and actions lead to clicks.
-
-### 4. Dashboard Projection (Seconds)
+### 3. Dashboard Projection (Seconds)
 
 The click is written to the tracking journal — a buffered Pekko Stream that batches events and writes them to PostgreSQL. Within a few seconds, Takeshi's advertiser dashboard updates:
 
@@ -85,13 +69,12 @@ This is one click. But notice what it touched:
 | System | What it learned | Timescale | Effect |
 |--------|----------------|-----------|--------|
 | Category Ranker | Travel works on this site | Days-weeks | Travel ads get more auction weight |
-| Creative Stats | This creative gets clicks | Minutes-hours | Thompson Sampling favors it |
-| RL Agent | This bid level produces clicks | 15-min windows | Bid multiplier adjusts over days |
+| Creative Stats | This creative gets clicks | Minutes-hours | Thompson Sampling favors it; quality-adjusted clearing also lowers what Takeshi pays |
 | Dashboard | Campaign is performing | Seconds | Advertiser sees results |
 
-Each system learns at its own pace. Thompson Sampling reacts within minutes — the next reader might see a different ad mix because of this click. The RL agent reacts within hours — the bid multiplier might shift by the end of the day. The category ranker reacts over weeks — Travel's weight on Yuki's site gradually increases.
+Each system learns at its own pace. Thompson Sampling reacts within minutes — the next reader might see a different ad mix because of this click. The category ranker reacts over weeks — Travel's weight on Yuki's site gradually increases.
 
-Five layers of learning, all from one click, at five different timescales. No manual optimization. No "let me adjust the bid." The system converges toward the right answer on its own.
+There's no campaign-side bid optimizer adjusting Takeshi's price after the click. The auction handles that automatically: a higher sampled CTR means a lower clearing CPM under quality-adjusted second-price pricing. Takeshi gets *cheaper* impressions for making creatives readers actually click, with no agent in the loop.
 
 ## Meanwhile, the Other Creative
 
@@ -105,4 +88,4 @@ This is the beauty of Thompson Sampling: bad creatives don't need to be manually
 
 ---
 
-*Technical deep dives: [Beta-Bernoulli Model](../serving/beta-bernoulli.md) · [Reward Function](../rl/reward-function.md) · [Learning Mechanisms](../comparison/learning.md)*
+*Technical deep dives: [Beta-Bernoulli Model](../serving/beta-bernoulli.md) · [Scoring Formula](../serving/scoring-formula.md) · [Learning Mechanisms](../comparison/learning.md)*

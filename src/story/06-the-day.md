@@ -36,39 +36,29 @@ The ryokan ad is winning most selections now. Not every time — Thompson Sampli
 
 If the hiking gear ad gets a click in its next few impressions, the ratio will tighten. If it doesn't, it'll fade further. No one needs to decide when to stop testing. The system self-regulates.
 
-## Noon: The RL Agent's First Observation (12:00pm)
+## Noon: A Reader Folds the Corner (12:00pm)
 
-Four hours in. The RL agent's 15-minute timer has fired 16 times since the day started. Each time, it observes:
+Four hours in. A reader on her lunch break opens an article on Yuki's blog about hot springs in the Hakone region. Takeshi's ryokan ad is in the sidebar — the collapsed magazine creative showing the cover photo of his garden bath. She taps it. The overlay expands: the cover, then a story page about the rooms, another about the meals, a final page with a "Reserve" button. She isn't booking a trip today, but she might in autumn. Before collapsing the ad, she folds the corner.
 
-```
-state = [effectiveCpm, ctr, winRate, budgetRemaining,
-         timeRemaining, spendRate, impressionRate, costPerClick]
-```
-
-At noon, the observation looks like:
+A `POST /v1/dogear-event` fires from her browser, carrying a `FoldToken` the serve response handed her earlier:
 
 ```
-state = [1.0,    — bidding at full CPM (multiplier = 1.0)
-         0.13,   — 13% CTR (2 clicks / 15 impressions this window)
-         0.82,   — winning 82% of bid opportunities
-         0.75,   — 75% budget remaining ($15 out of $20)
-         0.50,   — 50% time remaining (noon)
-         0.90,   — slightly underpacing (spending at 90% of ideal rate)
-         0.15,   — low impression volume
-         0.38]   — cost per click / maxCpm
+{
+  "token": "<HMAC-signed payload: pub|url|slot|cid|ver|bucket|camp|adv|nonce>",
+  "slot":  "sidebar-1",
+  "cid":   "ryokan-magazine-001"
+}
 ```
 
-The reward from the last window: 1 click, no overspend penalty.
+The fold endpoint verifies the HMAC, checks the time bucket is fresh, and accepts. Three things happen, all engagement-only — no billing, no auction state change:
 
-```
-reward = 1.0 - 0.0 = 1.0
-```
+- **Pin stored in the reader's browser.** The `dogear-storage` IndexedDB row in her browser remembers `(advertiserId, creativeId)` so the next page load on Yuki's site that's eligible for Takeshi will surface this exact creative.
+- **`logFold` writes a tracking event.** The dashboard projection ticks the campaign's fold counter — a reader-engagement signal Takeshi can see on his dashboard.
+- **No CPM clearing, no budget reservation.** Folds are free. The fold isn't a billable event; the original impression already cleared.
 
-The agent stores this transition in its replay buffer and trains: sample 32 random transitions, compute Double DQN targets, one SGD step. Then it selects the next action.
+There's no RL agent to "observe" this. The auction doesn't change behavior. What changes is that *this reader* is now linked, by her own choice, to Takeshi's campaign. Tomorrow, when she lands on a page where Takeshi is eligible, the bookmarked creative is the one served — bypassing the auction reservation and the pacing throttle. The pin is her vote, and the system honors it.
 
-The agent's epsilon is still high (about 0.92 on day 1 — almost fully random). It randomly picks action 3 (bid 10% higher): `multiplier = 1.0 × 1.1 = 1.1`. The effective CPM for the next 15 minutes will be $5.50.
-
-Will this help? Maybe. Higher bids mean winning more auctions against the JR Rail Pass ($8 CPM). Or maybe the extra cost isn't worth it. The agent doesn't know yet. It's exploring.
+It's the first thing in this story that wouldn't happen on a traditional ad exchange. Readers don't get to bookmark ads anywhere else.
 
 ## Afternoon: Pacing Adjusts (2:00-5:00pm)
 
@@ -100,18 +90,18 @@ Instead of assuming linear time = linear spend, the pacing target will follow th
 
 A re-auction fires for Yuki's site. What's changed since 2am?
 
-- **JR Rail Pass campaign ran out of budget** at 4pm. Its RL agent bid too aggressively (multiplier reached 1.4) and burned through the daily budget by mid-afternoon.
+- **JR Rail Pass campaign ran out of budget** at 4pm. Its $8 CPM bid was the highest, but its CTR was mediocre — quality-adjusted clearing kept its eCPM lower than the bid, but the volume still drained the daily budget by mid-afternoon. The pacing controller has been throttling its serves for the last hour.
 - **A new advertiser appeared**: a Kyoto pottery workshop, targeting East Asian Culture, $3 CPM.
 
 The auction re-runs with the updated participants:
 
 ```
-Slot 1 (banner):  Takeshi's Ryokan  — $5.50 CPM (multiplier bumped to 1.1)
+Slot 1 (banner):  Takeshi's Ryokan  — $5.00 CPM (honest bid)
 Slot 2 (sidebar): Hiking Gear Co    — $4.00 CPM
 Slot 3 (sidebar): Pottery Workshop  — $3.00 CPM (new!)
 ```
 
-JR Rail Pass is gone — budget exhausted. But its creatives stay in the ServeIndex with a refreshed TTL (they'll be there when budget resets tomorrow). Takeshi's ryokan, which was the second-highest bidder this morning, is now the top bidder.
+JR Rail Pass is gone — budget exhausted. But its creatives stay in the ServeIndex with a refreshed TTL (they'll be there when budget resets tomorrow). Takeshi's ryokan, which was the second-highest bidder this morning, is now the top bidder. Note Takeshi's bid hasn't changed — the auction extracts the right clearing price from the runner-up's score, so there's nothing for Takeshi to "tune."
 
 The re-auction takes about 3 seconds. The new candidates propagate to all nodes within 2 seconds of gossip. The next reader sees the updated lineup.
 
@@ -119,7 +109,7 @@ The re-auction takes about 3 seconds. The new candidates propagate to all nodes 
 
 At midnight (or the configured day boundary), the day resets.
 
-**CampaignEntity**: Budget resets to $20. Spend counter goes to zero. The RL agent's `resetDay()` fires: it stores a terminal transition (the final reward from the last window), resets the bid multiplier to 1.0, and clears the window counters. But the DQN weights survive — everything it learned today carries into tomorrow.
+**CampaignEntity**: Budget resets to $20. Spend counter goes to zero. The pacing buckets reset, the spend Bloom filter rolls. There's no agent to "reset" — the campaign always bids its honest $5 CPM, and the auction's quality-adjusted second-price clearing means Takeshi's effective price keeps drifting down as his CTR builds.
 
 **TrafficShapeTracker**: Today's hourly traffic volumes are blended into the stored profile with `dayAlpha = 0.2`. After 5 days, the profile is a smoothed average of observed traffic patterns.
 
