@@ -20,6 +20,7 @@
 # The Ad Format
 
 - [The Magazine Format](./format/overview.md)
+  - [The Dog-Ear](./format/dog-ear.md)
 
 # Deep Dives
 
