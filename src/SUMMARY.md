@@ -56,6 +56,7 @@
 - [Fair Candidate Selection](./serving/fair-selection.md)
   - [Per-Campaign Diversity](./serving/campaign-diversity.md)
   - [Frequency Capping](./serving/frequency-capping.md)
+- [Pin-Honoring at Serve Time](./serving/pin-honoring.md)
 
 ## Budget Pacing
 
