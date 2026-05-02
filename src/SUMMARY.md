@@ -23,6 +23,7 @@
   - [The Dog-Ear](./format/dog-ear.md)
   - [Fluid Creatives](./format/fluid-creatives.md)
   - [The LP-to-Creative Pipeline](./format/lp-to-creative.md)
+  - [The Designer and Banner Stack](./format/designer.md)
 
 # Deep Dives
 
