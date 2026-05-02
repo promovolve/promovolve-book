@@ -21,6 +21,7 @@
 
 - [The Magazine Format](./format/overview.md)
   - [The Dog-Ear](./format/dog-ear.md)
+  - [Fluid Creatives](./format/fluid-creatives.md)
 
 # Deep Dives
 
