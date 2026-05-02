@@ -71,6 +71,11 @@
   - [Traffic Shape Learning](./pacing/traffic-shape.md)
   - [Grace Periods & Hybrid Modes](./pacing/grace-periods.md)
 
+## Crawler
+
+- [The Crawler](./crawler/overview.md)
+  - [The Crawl Scheduler](./crawler/scheduler.md)
+
 ## Distributed State
 
 - [Distributed State from Scratch](./distributed/from-scratch.md)
