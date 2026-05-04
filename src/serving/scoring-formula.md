@@ -1,15 +1,27 @@
 # Scoring Formula
 
-At serve time, Thompson Sampling selects which creative to show. The score combines creative quality with advertiser bid:
+At serve time, Thompson Sampling selects which creative to show. The score combines two engagement posteriors with the advertiser bid:
 
 ```
-score = sampledCTR × CPM^α
+engagement = sampledCTR + FoldWeight × sampledFold + newcomerBonus(impressions)
+score      = engagement × CPM^α
 ```
 
 Where:
-- **sampledCTR**: A random draw from the creative's Beta posterior — how likely a reader is to click
+- **sampledCTR**: A random draw from the click-rate Beta posterior — how likely a reader is to click
+- **sampledFold**: A random draw from the fold-rate Beta posterior — how likely a reader is to bookmark (dog-ear) the creative for later
+- **FoldWeight = 2.0**: Folds are rarer than clicks but signal stronger intent, so they're weighted twice as much per unit rate
+- **newcomerBonus**: An additive boost for creatives that haven't yet built up their own posterior; decays linearly with impressions
 - **CPM**: The advertiser's maximum bid per thousand impressions
 - **α**: The publisher's bid weight — how much money matters vs quality
+
+## Why Two Posteriors?
+
+A click is the cheapest unit of attention — fingers slip, headlines mislead, sometimes you click and immediately regret it. A **fold** (dog-ear bookmark) requires the reader to deliberately tap the corner of an expanded creative because they want to come back to it later. That's a much stronger signal of intent.
+
+Tracking both gives the auction a fuller picture: a creative with a 5% CTR and a 30% fold rate is signaling *much* more value to the publisher's audience than a creative with the same CTR and a 1% fold rate. The combiner weights folds at 2× CTR's contribution per unit rate, so a high fold rate moves the score noticeably even when click rates are similar.
+
+Both posteriors live in the same `CreativeStats` bucket structure (1-minute buckets, 60-minute window) and update together on the same fold/click/impression beacons. See [Beta-Bernoulli Model](./beta-bernoulli.md) for the conjugate-prior math that lets them share the framework.
 
 ## The Publisher's Dial
 
@@ -45,20 +57,16 @@ Two campaigns compete for a travel article slot. The publisher uses Balanced (α
 |---|---|---|
 | Max CPM | $5.00 | $8.00 |
 | True CTR | ~4% | ~2% |
+| True Fold rate | ~12% | ~3% |
 | Sampled CTR | 0.038 | 0.025 |
+| Sampled Fold rate | 0.115 | 0.028 |
+| Engagement (CTR + 2×Fold) | 0.268 | 0.081 |
 | CPM^0.5 | 2.24 | 2.83 |
-| **Score** | **0.085** | **0.071** |
+| **Score** | **0.600** | **0.229** |
 
-Takeshi's ryokan wins despite bidding 38% less. Its 1.5x CTR advantage outweighs JR's 1.26x bid advantage (after sqrt compression).
+Takeshi's ryokan wins decisively. The fold signal is doing most of the work — readers who saw both creatives bookmarked Takeshi's nearly 4× more often, and `FoldWeight = 2.0` projects that into a meaningful score gap. Without the fold posterior, the scores would have been much closer (0.085 vs 0.071, the original CTR-only example), and a small bid bump could have flipped the outcome.
 
-If the publisher switched to Revenue (α=0.7):
-
-| | Takeshi's Ryokan | JR Rail Pass |
-|---|---|---|
-| CPM^0.7 | 3.09 | 4.60 |
-| **Score** | **0.118** | **0.115** |
-
-Now it's nearly a coin flip — JR's money almost catches up. One more tick of α and JR would win.
+This is the point of the fold signal: it lets the auction reward creatives that earn deeper engagement, not just curiosity clicks.
 
 ## Quality-Adjusted Pricing
 
@@ -79,14 +87,18 @@ During exploration (cold start, warmup, impression share guarantee), the winner 
 
 ## Cold Start Variant
 
-When a creative has zero impressions, Thompson Sampling can't estimate CTR from clicks. Instead, it uses the category-level score from the TaxonomyRankerEntity as a prior:
+When a creative has zero impressions, neither posterior has data. The system substitutes priors so cold candidates still produce a meaningful score:
 
 ```
-sampledCTR = categoryScore + random(-0.15, +0.15)
-score = sampledCTR × CPM^α
+sampledCTR  = categoryScore + random(-0.15, +0.15)   // page-classifier prior
+sampledFold = sampleBeta(1, 1)                        // uniform [0,1] cold prior
+engagement  = sampledCTR + 2.0 × sampledFold + NewcomerBoost
+score       = engagement × CPM^α
 ```
 
-The ±0.15 noise ensures cold candidates still have variance for exploration. A new creative with a good category match will sometimes sample high enough to win, get impressions, and begin building its own track record.
+The ±0.15 CTR noise ensures cold candidates have variance for exploration. The fold-rate prior is `Beta(1, 1)` — uniform over [0, 1] — which gives proper Thompson exploration on the fold dimension instead of pinning it to zero (an earlier bug where cold creatives could never win against warm fold-rich ones).
+
+The **newcomer bonus** is a UCB-style additive boost — full strength at impressions=0, decaying linearly to zero by the 50th impression. It guarantees newcomers get exposure even when warm creatives have built up confident posteriors. See [Cold Start Strategies](./cold-start.md) for the decay curve.
 
 ## What the Advertiser Sees
 
