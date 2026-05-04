@@ -10,8 +10,7 @@ build-dir = "book/en"
 [output.html]
 default-theme = "navy"
 preferred-dark-theme = "navy"
-additional-js = ["mermaid.min.js", "mermaid-init.js", "lang-toggle.js"]
-additional-css = ["lang-toggle.css"]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [preprocessor]
 
