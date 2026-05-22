@@ -50,6 +50,10 @@
 
 - [Publisher Creative Approval](./approval/overview.md)
 
+## Floor Optimization
+
+- [Floor Optimization](./floor-optimization/overview.md)
+
 ## Serve-Time Selection
 
 - [Thompson Sampling from Scratch](./serving/from-scratch.md)
