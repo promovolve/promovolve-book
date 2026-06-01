@@ -4,11 +4,11 @@ Let's follow Takeshi's ryokan campaign through its first full day.
 
 ## Morning: The Grace Period (8:00-8:02am)
 
-Yuki's site gets its first traffic of the day. The PI pacing controller has just started a new day — it doesn't know the request rate yet. For the first 10 seconds (or 10 requests, whichever is later), the controller is in **grace period**: it throttles at 99%, serving almost nothing.
+Yuki's site gets its first traffic of the day. The PI pacing controller has just started a new day — it doesn't know the request rate yet. For the first 10 seconds (or 10 requests, whichever is later), the controller is in the **grace period**: it *serves*, but capped by `baseThrottle` (the rate limit), and it holds back the PI integral until it has a stable rate estimate.
 
-Why? Because the controller needs to measure the traffic rate before it can regulate it. Serving aggressively without knowing the rate could blow the budget in the first few minutes. Better to be cautious for 10 seconds and get a baseline.
+Why not run the full controller immediately? Because the integral term would accumulate error from noisy startup data and overcorrect. But *refusing* to serve would be worse: at the start of the day spend is zero, so the campaign is maximally **behind** pace — serving is the safe direction. The rate cap alone already prevents a burst from blowing the budget, so there's no reason to go dark during warmup.
 
-After 10 requests, the TrafficObserver has computed an exponentially-weighted moving average of the request rate: about 2 requests per second at this hour. The PI controller calculates a base throttle:
+After 10 requests, the TrafficObserver has computed an exponentially-weighted moving average of the request rate: about 2 requests per second at this hour. The grace period ends and the PI controller layers its correction on top of the same base throttle it was already using:
 
 ```
 ideal_serve_rate = budget_remaining / time_remaining / avg_cpm × 1000

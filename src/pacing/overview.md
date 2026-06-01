@@ -40,7 +40,7 @@ graph LR
 1. **[Rate Tracking (EMA)](./rate-tracking.md)**: Synchronous, 1-second window, α=0.3
 2. **[PI Control Loop](./pi-control.md)**: Self-tuning gains, asymmetric response, leaky integrator
 3. **[Traffic Shape Learning](./traffic-shape.md)**: Separate weekday/weekend 24-hour profiles
-4. **[Grace Periods](./grace-periods.md)**: Startup protection with MaxThrottleProb (0.99)
+4. **[Grace Periods](./grace-periods.md)**: Startup protection — serves at the rate cap (`baseThrottle`) while withholding the PI integral until the rate estimate is stable
 
 ## Pipeline Position
 
