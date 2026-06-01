@@ -23,6 +23,7 @@
   - [The Dog-Ear](./format/dog-ear.md)
   - [Fluid Creatives](./format/fluid-creatives.md)
   - [The LP-to-Creative Pipeline](./format/lp-to-creative.md)
+  - [Brand Kit: Matching the Landing Page](./format/brand-kit.md)
   - [The Designer and Banner Stack](./format/designer.md)
 
 # Deep Dives
@@ -64,7 +65,6 @@
   - [Beta Distribution Sampling](./serving/beta-sampling.md)
 - [Fair Candidate Selection](./serving/fair-selection.md)
   - [Per-Campaign Diversity](./serving/campaign-diversity.md)
-  - [Frequency Capping](./serving/frequency-capping.md)
 - [Pin-Honoring at Serve Time](./serving/pin-honoring.md)
 
 ## Budget Pacing
