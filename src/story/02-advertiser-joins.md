@@ -6,7 +6,7 @@ He's tried Google Ads. The interface was overwhelming. Keywords, bid strategies,
 
 With Promovolve, Takeshi enters his ryokan's landing page URL, sets a daily budget of $20, a maximum CPM of $5, and selects his ad product category: Travel. The system pulls his landing page through Playwright, lets Gemini rewrite the copy into a few story-style pages, and the in-house designer renders an expandable magazine creative — cover, two interior pages with photos and rates, a final page with a "Reserve" call to action. Takeshi previews it once, approves the layout, and submits.
 
-That's it. No keywords. No audience targeting. No bid strategy to configure. No locked-in pixel dimensions either — the same creative will reflow into whatever slot a publisher offers. Promovolve automatically figures out which *content* categories match his product — articles about destinations, hiking, cultural tourism — using the official IAB mapping between ad product and content taxonomies. His ad will appear next to those articles, the exact context where someone would be interested in a ryokan.
+That's it. No keywords. No audience targeting. No bid strategy to configure. No locked-in pixel dimensions either — the same creative will reflow into whatever slot a publisher offers. Promovolve automatically figures out which *content* categories his ad belongs next to: when Gemini read his landing page, it also suggested the matching content categories — articles about destinations, hiking, cultural tourism. Takeshi can fine-tune the list, but he doesn't have to. His ad will appear next to those articles, the exact context where someone would be interested in a ryokan.
 
 ## What Happens Behind the Scenes
 
@@ -16,7 +16,7 @@ When Takeshi creates his campaign, several things happen in the cluster:
 
 **The creative is stored.** The rendered magazine creative — pages, layout metadata, image references — is persisted to the creative repository. Each rendered image is uploaded to R2 (Cloudflare's S3-compatible storage), hashed by SHA-256 for deduplication, and recorded with its dimensions and MIME type. Takeshi's landing page URL stays attached to the campaign so the call-to-action page can deep-link there.
 
-**Categories are derived.** Takeshi chose "Travel" as his ad product category (IAB Ad Product Taxonomy 2.0). The system calls `ContentToAdProductMapping.getContentForAdProduct()` to derive the matching content categories (IAB Content Taxonomy 2.1) — a set of numeric IDs representing destinations, outdoor recreation, cultural tourism, and other content topics that match a travel product. If no direct mapping exists, it walks up the taxonomy's parent chain until it finds one. Takeshi doesn't need to know any of this — he just said "Travel."
+**Categories are suggested.** Takeshi chose "Travel" as his ad product category (IAB Ad Product Taxonomy 2.0) — that label feeds publisher blocklists, so a publisher who bans a product type never sees it. His campaign's *targeting* comes from somewhere more direct: when Gemini analyzed his landing page for the creative, it also detected which content categories (IAB Content Taxonomy 3.0) the ryokan belongs next to — destinations, outdoor recreation, cultural tourism — and stored them as the campaign's target set. Takeshi can edit the set explicitly; if he doesn't, the suggestion is what his campaign bids on. He doesn't need to know any of this — he just showed the system his landing page.
 
 **The CampaignDirectory is notified.** A cluster singleton maintains a reverse index: category → set of campaigns. It registers Takeshi's campaign under each of its derived content categories, then fans out the update to `CategoryBidderEntity` shards via `CampaignDistributor` (8 workers). Now, whenever a page is classified into one of those categories, the auction knows to ask Takeshi's campaign for a bid.
 
@@ -38,13 +38,13 @@ Yuki approves the ryokan ad. It fits her site perfectly.
 
 Takeshi's campaign is now in the system:
 - Magazine creative rendered and approved for Yuki's site
-- Ad product category: Travel (content categories derived automatically)
+- Ad product category: Travel; target content categories suggested automatically from his landing page
 - Budget: $20/day, max CPM: $5
 - No bid optimizer to configure — the auction handles price discovery
 
-The next time the AuctioneerEntity for Yuki's site runs an auction — either from a fresh crawl or the 5-minute re-auction timer — Takeshi's campaign will be among the bidders.
+The next time the AuctioneerEntity for Yuki's site runs an auction — whether event-driven or from the 5-minute re-auction timer — Takeshi's campaign will be among the bidders.
 
-But Takeshi isn't the only advertiser. A regional JR rail pass campaign is also targeting Travel with a $8 CPM. A hiking gear company targets Hiking/Camping at $4 CPM. A new cooking class in Kyoto targets Food & Drink at $3 CPM.
+But Takeshi isn't the only advertiser. A regional JR rail pass campaign is also targeting Travel with a $8 CPM. A hiking gear company targets Adventure Travel at $4 CPM. A new cooking class in Kyoto targets Food & Drink at $3 CPM.
 
 How does the system decide who gets which slot? That's the auction.
 

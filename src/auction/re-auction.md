@@ -1,6 +1,6 @@
 # Re-Auction & Event Triggers
 
-Between crawl cycles, the system keeps the ServeIndex fresh through periodic and event-driven re-auctions.
+Between classification refreshes, the system keeps the ServeIndex fresh through periodic and event-driven re-auctions.
 
 ## Periodic Re-Auction
 

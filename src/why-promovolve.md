@@ -76,7 +76,7 @@ Traditional creatives are pinned to IAB pixel dimensions: 300×250, 728×90, 970
 
 ### Auctions happen before users arrive
 
-Traditional systems run an auction on every page load because they need to evaluate the user in real time. Promovolve doesn't need to — the content doesn't change between page loads. So the auction runs when content is published or updated (via scheduled crawl), and the results are cached in a replicated in-memory index. When a user arrives, the ad is already chosen. Serve latency drops from 50–200ms to under 1ms.
+Traditional systems run an auction on every page load because they need to evaluate the user in real time. Promovolve doesn't need to — the content doesn't change between page loads. So the auction runs when a page is first classified (on demand, via the ad tag itself) and re-runs event-driven as campaigns and budgets change, and the results are cached in a replicated in-memory index. When a user arrives, the ad is already chosen. Serve latency drops from 50–200ms to under 1ms.
 
 ### Multiple candidates, not a single winner
 
@@ -122,7 +122,7 @@ Promovolve lowers the bar to zero. An advertiser is anyone with an image and a l
 - A **small hotel in Kyoto** reaching readers of a travel article about their neighborhood
 - A **global brand** running a campaign across a network of niche publishers
 
-There's no DSP to integrate with. No bid strategy to configure manually — the second-price auction handles price discovery, and quality-adjusted scoring rewards creatives readers actually engage with. No user profiles to buy. Just: "here's my ad, here's my budget, here's what my product is." The advertiser picks an ad product category (e.g., "Travel" or "Kitchen Equipment"), and the system automatically derives which content categories match — using the official IAB mapping between Ad Product Taxonomy 2.0 and Content Taxonomy 2.1. The system handles the rest.
+There's no DSP to integrate with. No bid strategy to configure manually — the second-price auction handles price discovery, and quality-adjusted scoring rewards creatives readers actually engage with. No user profiles to buy. Just: "here's my ad, here's my budget, here's what my product is." The advertiser gives a landing page, and the system reads it and suggests which content categories match (IAB Content Taxonomy 3.0) — a set the advertiser can fine-tune but never has to build from scratch. The system handles the rest.
 
 This is how magazine advertising worked. A local restaurant could buy a quarter-page in a neighborhood magazine. The scale matched the business. Promovolve brings that accessibility to the web.
 

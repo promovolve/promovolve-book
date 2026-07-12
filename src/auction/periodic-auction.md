@@ -1,6 +1,6 @@
 # Periodic Batch Auction
 
-The defining architectural choice of Promovolve is that auctions run **ahead of time**, not per-request. When content is crawled (default schedule: 2am daily via Quartz cron), the system runs a full multi-phase auction and caches results in DData for instant serve-time lookups.
+The defining architectural choice of Promovolve is that auctions run **ahead of time**, not per-request. When a page is classified — on demand, triggered by its first visitor via the ad tag — the system runs a full multi-phase auction and caches results in DData for instant serve-time lookups.
 
 ## Auction Pipeline
 
@@ -34,7 +34,7 @@ The defining architectural choice of Promovolve is that auctions run **ahead of 
 
 ## Periodic Re-Auction
 
-Between crawl cycles, the system runs **periodic re-auctions** every 5 minutes (`promovolve.auction.reauction-interval`) for recent content within the 48-hour recency window. Additionally, event-driven re-auctions trigger on campaign/advertiser state changes.
+After the initial classification, the system runs **periodic re-auctions** every 5 minutes (`promovolve.auction.reauction-interval`) for recent content within the 48-hour recency window. Additionally, event-driven re-auctions trigger on campaign/advertiser state changes (approve, pause, budget events) on a 1-second debounce.
 
 ## Content Recency Window
 
@@ -45,9 +45,6 @@ Only pages classified within the last **48 hours** participate in auctions. Ever
 | Parameter | Value | Env Var |
 |-----------|-------|---------|
 | Re-auction interval | 5 minutes | `REAUCTION_INTERVAL` |
-| Content recency | 48 hours | — |
-| Crawl cron schedule | `"0 0 2 * * ?"` | Per-site config |
-| Crawl max depth | 2 | Per-site config |
-| Crawl concurrency | 5 | Per-site config |
+| Content recency | 48 hours (default; publisher-configurable) | — |
 | ServeIndex TTL | 120 minutes | — |
 | Taxonomy ask timeout | 800ms | — |

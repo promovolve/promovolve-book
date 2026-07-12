@@ -34,7 +34,7 @@ sequenceDiagram
     actor Adv as Advertiser (browser)
     participant Ed as Editor<br/>(creative-editor.html)
     participant API as API<br/>(analyze-lp)
-    participant Cr as Crawler<br/>(LPAnalyzer + lp-analyzer.js)
+    participant Cr as LP Analyzer<br/>(browser module: LPAnalyzer + lp-analyzer.js)
     participant Dz as Designer<br/>(creative-designer)
     participant DB as creative.pages_json
     participant Bn as Banner (viewer)
@@ -83,11 +83,18 @@ The font path shares steps 1–3, then adds two things colours don't need:
 viewer's runtime) and a **FontFace registration** in the banner. CJK faces
 (Noto Sans/Serif JP) take a per-creative `text=` subset; see the `alt` branch.
 
+LP-original faces that aren't on Google Fonts can also be re-hosted, but only
+opt-in: the editor's wizard shows a license-consent checkbox, and only when it
+is ticked do the font grants (`lpFonts` — family + weight + quarantine hash)
+ride the save. At publish, `CreativeProcessor` copies each quarantined woff2
+(`fonts/orig/<hash>`) into the live font catalog; without the consent, the
+face falls back to its system bucket like any other non-allow-listed family.
+
 ```mermaid
 sequenceDiagram
     actor Adv as Advertiser (browser)
     participant Ed as Editor<br/>(creative-editor.html)
-    participant Cr as Crawler<br/>(lp-analyzer.js extractFonts)
+    participant Cr as LP Analyzer<br/>(lp-analyzer.js extractFonts)
     participant API as API<br/>(CreativeProcessor / FontProvisioner)
     participant Dz as Designer<br/>(creative-designer)
     participant GF as Google Fonts (css2)
@@ -156,15 +163,18 @@ sequenceDiagram
   a `subsetKey` mismatch — simply 404s and the CSS stack's system family takes
   over (`_systemBucket`: Mincho→serif, Gothic→sans, else sans/Georgia). Nothing
   ever renders invisibly.
-- **Same scope as today's auto-layout.** Kit colours and fonts apply to the
-  synthesized collapsed layout and the expanded masters; explicit IAB-size
-  presets keep the system fallback. With no kit, behaviour is unchanged.
+- **Every preset consults the kit.** Kit colours and fonts apply to the
+  synthesized collapsed layout, the expanded surfaces, and the explicit
+  size-bucket presets alike — the banner self-hosts the faces across all
+  banner buckets, so collapsed units render the LP font too. With no kit,
+  behaviour is unchanged (system fallback).
 
 ## Source of truth
 
 - Kit + helpers: `platform/creative-designer/src/brand-kit.ts`
   (`kitFont`, `kitColor`), `color-contrast.ts` (`resolveLayoutColors`).
-- Extraction: `modules/crawler/.../lp-analyzer.js`, `LPAnalyzer.scala`.
+- Extraction: `modules/browser/src/main/resources/lp-analyzer.js`,
+  `modules/browser/src/main/scala/promovolve/browser/LPAnalyzer.scala`.
 - Editor seeding: `platform/templates/advertiser/creative-editor.html`
   (`buildBrandKitFromLP`, `_snapFont`, `_systemBucket`).
 - Self-hosting: `GoogleFontCatalog.scala`, `GoogleFontProvisioner.scala`,

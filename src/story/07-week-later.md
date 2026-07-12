@@ -59,12 +59,12 @@ The TaxonomyRankerEntity for Yuki's site has accumulated a week of data:
 
 ```
 Travel:           Beta(45, 355)  — 11.3% CTR, tight distribution
-Hiking/Camping:   Beta(8, 192)   — 4.0% CTR, fairly confident
-East Asian Culture: Beta(5, 45)  — 10.0% CTR, still exploring
+Adventure Travel: Beta(8, 192)  — 4.0% CTR, fairly confident
+Asia Travel:      Beta(5, 45)   — 10.0% CTR, still exploring
 Food & Drink:     Beta(2, 28)    — 6.7% CTR, early data
 ```
 
-Travel dominates — it gets the highest weight in most auctions. But East Asian Culture is a surprise performer. The pottery workshop (East Asian Culture category) is driving this. The ranker is giving East Asian Culture more auction weight, which means more bidding opportunities for advertisers in that category.
+Travel dominates — it gets the highest weight in most auctions. But Asia Travel is a surprise performer. The pottery workshop (Asia Travel category) is driving this. The ranker is giving Asia Travel more auction weight, which means more bidding opportunities for advertisers in that category.
 
 This creates a virtuous cycle: good category performance → more auction weight → more candidates → more data → better Thompson Sampling → better ads → higher CTR → higher category performance.
 

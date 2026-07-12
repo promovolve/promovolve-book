@@ -514,7 +514,7 @@ Sweep automates the *floor*. But a publisher's revenue also depends on:
 - **Which advertisers are even allowed to bid** (the publisher's approval
   queue and blocklist).
 - **Which ad slots are exposed at all** (the publisher's page layout and
-  the slots the crawler discovers).
+  the slots the ad tag discovers on the live page).
 - **What happens when no one bids** (does the slot stay empty or fall
   back to a generic "filler" auction?).
 - **How aggressively the auction prefers high-bidding creatives over

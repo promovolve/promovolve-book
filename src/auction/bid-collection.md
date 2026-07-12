@@ -8,29 +8,25 @@ To understand bid collection, it helps to see the full chain that connects an ad
 
 **Campaign setup (happens once):**
 
-1. Advertiser creates a campaign and selects ad product: **"Gyms and Health Clubs"** (IAB Ad Product 1512)
-2. `ContentToAdProductMapping.getContentForAdProduct("1512")` looks up the IAB mapping
-3. No direct mapping for 1512 → walks up to parent **1510** (Fitness Activities)
-4. 1510 maps to content categories **{225, 227}** (Fitness and Exercise, Running and Jogging)
-5. Campaign stores `categories = Set(225, 227)` — these are the content types this campaign will bid on
-6. CampaignDirectory registers the campaign under categories 225 and 227
-7. CategoryBidderEntity for categories 225 and 227 now knows this campaign exists
+1. Advertiser creates a campaign for their gym. The ad product category (**"Gyms and Health Clubs"**, IAB Ad Product 1512) is still declared — but it only feeds publisher blocklists, not matching
+2. Target content categories are an explicit declaration in **IAB Content Taxonomy 3.0**: Gemini analyzes the campaign's landing page and suggests a set — say **{225, 227}** (Fitness and Exercise, Running and Jogging) — which the advertiser can edit
+3. Campaign stores `categories = Set(225, 227)` — these are the content types this campaign will bid on
+4. CampaignDirectory registers the campaign under categories 225 and 227
+5. CategoryBidderEntity for categories 225 and 227 now knows this campaign exists
 
-**Page crawl (happens per page):**
+**On-demand classification (happens per page):**
 
-8. SiteEntity collects **demand categories** from all active campaigns → `{225, 227}`
-9. `buildTaxonomyCandidates` expands these with descendants → `{226, 227}` (Participant Sports, Running and Jogging)
-10. This becomes the **candidate list** sent to Gemini — the LLM only sees categories that active campaigns are targeting
-11. Gemini classifies the page text using only those categories
-12. If it returns 225 or 227 with sufficient confidence, AuctioneerEntity fans out bid requests to CategoryBidderEntity
-13. CategoryBidderEntity routes to the gym campaign
-14. Campaign bids → candidate created → queued for publisher approval
+6. A page's first visitor arrives; the ad tag extracts the live page's text and POSTs it to `/v1/classify-page`, which hands it to SiteEntity → Gemini
+7. Gemini sees the **full Content Taxonomy 3.0** and returns whatever genuinely matches the page (possibly nothing); if it returns nothing, the site's known **demand categories** seed a broad low-confidence fallback pool so the auction isn't starved
+8. If the page classifies into 225 or 227 with sufficient confidence, AuctioneerEntity fans out bid requests to CategoryBidderEntity — demand intersection happens here, at the fan-out
+9. CategoryBidderEntity routes to the gym campaign
+10. Campaign bids → candidate created → queued for publisher approval
 
 **Key design decisions:**
 
-- The LLM prompt is **constrained to demand categories** — it only classifies into categories that have active campaigns. This saves tokens and avoids classifying content nobody is advertising for.
-- Hallucinated category IDs (where the LLM returns an ID not in the candidate list) are **filtered out** — only valid matches produce auctions.
-- The advertiser never sees content categories. They pick their product; the IAB mapping handles the rest.
+- The classifier is **honest**: it sees the full taxonomy and reports what the page is actually about. Demand intersection happens downstream at the auction fan-out, not by constraining the prompt.
+- Hallucinated category IDs (where the LLM returns an ID not in the taxonomy) are **filtered out** — only valid matches produce auctions.
+- Both sides speak Content Taxonomy 3.0 IDs directly. There is no content↔ad-product mapping layer — the advertiser's target categories come from Gemini's read of their own landing page, refined by hand if they wish.
 
 ## CategoryBidderEntity
 
@@ -58,7 +54,7 @@ The advertiser bids their true value. There's no bid shading or multiplier — t
 
 A CampaignEntity will not respond if any of these checks fail:
 
-1. **Category mismatch**: The page category is not in the campaign's `categories` set — this is the primary filter. The campaign's categories are derived from its Ad Product Taxonomy 2.0 ID via `ContentToAdProductMapping`, which maps to a set of Content Taxonomy 2.1 IDs. Matching is **exact**: `state.categories.contains(pageCategory)`
+1. **Category mismatch**: The page category is not in the campaign's `categories` set — this is the primary filter. The campaign's categories are its declared Content Taxonomy 3.0 target set (Gemini-suggested from the landing page, advertiser-editable). Matching is **exact**: `state.categories.contains(pageCategory)`
 2. **Category blocklisted**: The category is in the campaign's `categoryBlocklist` (explicit exclusions)
 3. **Status paused**: Campaign `status != Active`
 4. **Budget exhausted**: `dailyBudget - (spendToday + bufferedSpend) <= 0`

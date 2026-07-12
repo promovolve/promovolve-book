@@ -2,7 +2,7 @@
 
 The [magazine format](./overview.md) is a contract between two pieces of TypeScript code:
 
-- The **designer** (`platform/creative-designer/`) — a page builder where advertisers compose creatives. Drag, resize, rotate; type copy; pick fonts and colors; fan out across IAB sizes.
+- The **designer** (`platform/creative-designer/`) — a page builder where advertisers compose creatives. Drag, resize, rotate; type copy; pick fonts and colors; fan out across ad shapes.
 - The **banner** (`platform/banner-component/`) — the runtime web component publishers embed. Renders the same data the designer produces.
 
 The contract is a JSON shape: `BannerConfig` plus a `Pages` array. The designer writes it. The banner reads it. WYSIWYG isn't an aspiration — it's a constraint. If the same JSON renders differently in the two places, something is broken.
@@ -15,7 +15,7 @@ The structural pieces:
 
 ```
 src/
-├── modes.ts          ← canvas mode catalog (Expanded PC, Mobile, IAB sizes)
+├── modes.ts          ← canvas mode catalog (portrait reader + aspect buckets)
 ├── state.ts          ← functional state updates (immutable transitions)
 ├── store.ts          ← in-house pub/sub store
 ├── types.ts          ← shared with banner-component
@@ -36,24 +36,31 @@ src/
 
 ## Canvas modes
 
-A creative isn't a single layout — it's a primary 16:9 "expanded" composition plus an optional set of IAB-sized variants (300×250, 728×90, 970×250, etc.). The `MODES` table in `modes.ts` lists all eleven:
+A creative isn't a single layout — it's the portrait 9:16 "expanded" reader composition plus a set of collapsed aspect-bucket variants. The `MODES` table in `modes.ts` lists six editable modes, portrait-first (the surface that actually ships expanded opens first):
 
 ```ts
-{ key: "expanded", label: "Expanded PC (16:9)",     w: 1600, h: 900 }
-{ key: "mobile",   label: "Expanded Mobile (9:16)", w: 540,  h: 960, sizeKey: "mobile-expanded" }
-{ key: "300x250",  ...                                         sizeKey: "300x250" }
-{ key: "728x90",   ...                                         sizeKey: "728x90" }
-…etc.
+{ key: "mobile",   label: "Expanded (9:16)", w: 540, h: 960, sizeKey: "mobile-expanded" }
+// Collapsed aspect buckets; the pixel size is the canonical design canvas.
+{ key: "300x250",  label: "Rectangle (6:5)", w: 300, h: 250, sizeKey: "300x250" }
+{ key: "970x250",  label: "Billboard (4:1)", w: 970, h: 250, sizeKey: "970x250" }
+{ key: "728x90",   label: "Strip (8:1)",     w: 728, h: 90,  sizeKey: "728x90" }
+{ key: "320x100",  label: "Mobile (16:5)",   w: 320, h: 100, sizeKey: "320x100" }
+{ key: "300x600",  label: "Tall (1:2)",      w: 300, h: 600, sizeKey: "300x600" }
 ```
 
-The expanded mode is the master. Sized modes are *fanouts* — variants of the same content reflowed for that aspect ratio. The data model reflects this:
+The portrait reader is the authoring master: it's what every device renders when the ad expands — full-bleed on mobile, a floating 9:16 magazine sheet on PC. Bucket modes are *fanouts* — the same content reflowed for a collapsed shape. The buckets are aspect shapes, not the full IAB size list: delivery picks the authored layout whose aspect is nearest the slot's and renders it fluidly into the slot's actual box, so five shapes cover the whole IAB zoo (a 336×280 slot gets the 300×250 layout, a 320×50 strip the 320×100 one, and so on).
 
-- Expanded mode mutations target `page.layout` (the master layout array).
-- Sized mode mutations target `page.banners[sizeKey]` (the per-size fanout).
+There's a seventh layout that has no tab: `WIDE_MASTER`, the 16:9 wide layout exported separately from `MODES`. It's a machine-generated delivery artifact stored in `page.layout` — wide collapsed slots render it, creatives published before the portrait fanout fall back to it in the reader, and collapsed-bucket colours anchor on it. Auto-layout keeps generating it invisibly; it's not hand-editable and must not be deleted.
 
-The size-matrix UI shows all sizes side-by-side as thumbnails so the author can spot mismatches and re-fan-out from the master. The [LP-to-creative pipeline](./lp-to-creative.md) seeds both expanded and mobile in stage 3 (the paired Gemini call); the author can then fan out to additional IAB sizes from the matrix.
+The data model:
 
-Because the format is fluid (see [Fluid Creatives](./fluid-creatives.md)), most advertisers don't need every IAB size — the expanded master scales into many slots. Sized fanouts exist for cases where the master at, say, 300×250 needs a tighter composition than a straight scale would produce.
+- Reader mutations target `page.banners["mobile-expanded"]`.
+- Bucket mutations target `page.banners[sizeKey]`.
+- `page.layout` holds the generated 16:9 wide artifact.
+
+The size-matrix UI shows all sizes side-by-side as thumbnails so the author can spot mismatches and re-fan-out. The [LP-to-creative pipeline](./lp-to-creative.md) seeds both the portrait reader and the wide artifact in stage 3 (the paired Gemini call); the aspect buckets fill from deterministic presets.
+
+Because the format is fluid (see [Fluid Creatives](./fluid-creatives.md)), no advertiser authors per-pixel IAB sizes — the bucket layouts scale into every slot of a similar shape. Buckets exist because a composition that works at 9:16 needs a genuinely different arrangement at 728×90.
 
 ## The page model
 
@@ -68,8 +75,8 @@ interface Page {
   bg?: string;                   // page background color
   isCTA?: boolean;
   ctaUrl?: string;
-  layout?: LayoutItem[];          // expanded layout
-  banners?: Record<string, LayoutItem[]>; // per-IAB-size fanouts
+  layout?: LayoutItem[];          // 16:9 wide layout (generated delivery artifact)
+  banners?: Record<string, LayoutItem[]>; // reader ("mobile-expanded") + aspect buckets
   videoBg?: VideoBg;
 }
 ```

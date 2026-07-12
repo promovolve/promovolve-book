@@ -17,13 +17,14 @@ Advertiser (sharded by advertiserId)
 
 Publisher
   └── Site (sharded by siteId)
-        ├── Config: domain, seedUrl, cronSchedule, maxDepth
+        ├── Config: domain (+ seedUrl, cronSchedule, maxDepth — inert crawl-era vestiges)
+        ├── Page classifications: Map[URL, ClassificationEntry] (durable copy)
         ├── PacingConfig: dayDuration, traffic shapes, warmupMode
         ├── Ad product blocklist: Set[AdProductCategoryId]
         └── Slots: List[AdSlotConfig(slotId, width, height)]
 
 AuctioneerEntity (sharded by siteId)
-  ├── Page classifications: Map[URL, Classification]
+  ├── lastPage: Map[URL, (categories, slots, classifiedAt)] (in-memory cache)
   ├── Participating campaigns: Map[CampaignId, Set[URL]]
   ├── TaxonomyRankerEntity (sharded by category|siteId)
   │     └── Thompson Sampling weights, half-life decay
@@ -68,7 +69,8 @@ The spend path is carefully designed for correctness:
 4. **Persist-then-publish**: State saved before `SpendUpdate` event published
 
 ### AuctioneerEntity
-- **Activated** on first crawl of a site's page
+- **Activated** on the first classify/serve of a site's page
+- **Holds** an in-memory `lastPage` cache of classifications — the durable copy lives in `SiteEntity.pageClassifications`, reseeded at boot via `RestoreClassifications` and recovered per-URL on a `Reevaluate` miss
 - **Tracks** which campaigns participated in recent auctions (for targeted re-auction)
 - **Periodic re-auction**: Every 5 minutes (`promovolve.auction.reauction-interval`)
 - **Cleanup**: Removes classifications older than 48 hours every 5 minutes

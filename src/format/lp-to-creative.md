@@ -37,7 +37,7 @@ Stages 1–3 happen during the advertiser's onboarding flow, in real time. Stage
 
 - Many landing pages render content with JavaScript. An HTTP fetch returns the empty SPA shell.
 - Hero images are often loaded lazily; without rendering them, the analyzer can't capture them as image references.
-- Some pages are gated behind cookie banners or anti-bot checks that need a real browser context (the [stealth integration](../crawler/stealth.md) is shared with this path).
+- Some pages are gated behind cookie banners or anti-bot checks that need a real browser context (`LPAnalyzer` injects a stealth init script — `modules/browser/src/main/resources/stealth.js` — before navigation).
 
 Once the page is rendered, the analyzer extracts a structured representation:
 
@@ -78,6 +78,8 @@ A page with copy isn't a creative yet. The copy needs to live on a canvas — te
 - **Mobile layout** at 9:16 aspect ratio.
 
 Both in one call. The "pair" is deliberate — generating them together produces variants that read as the *same composition reflowed*, not two unrelated layouts that happen to share copy. Item positions, font weights, and animation cues are paired across PC and mobile so a reader looking at the same page on different devices sees a recognizable design.
+
+Since the reader went portrait-everywhere, the two variants land differently: the 9:16 layout is the expanded surface every device actually renders (and the designer's first tab), while the 16:9 layout is stored as `page.layout` — a tabless delivery artifact that wide collapsed slots and legacy readers still render.
 
 The output is a JSON `LayoutItem[]` — text items with `(left, top, fontSize, color)`, image items with crops, animations with `(targetX, targetY, duration, delay)`. The same schema the [designer](./designer.md) uses for hand-authored creatives, which means hand-authored and AI-generated creatives are indistinguishable downstream.
 
@@ -134,7 +136,7 @@ The other half of the same claim — "and it'll look good in any slot" — is th
 
 ## Source of truth
 
-- `modules/crawler/src/main/scala/promovolve/crawler/LPAnalyzer.scala` — Stage 1 + Stage 5b's `renderBanner`
+- `modules/browser/src/main/scala/promovolve/browser/LPAnalyzer.scala` — Stage 1 + Stage 5b's `renderBanner`
 - `modules/core/src/main/scala/promovolve/creative/LPExtractor.scala` — Stage 2 (rewriteSections), Stage 3 (generateLayoutPair)
 - `modules/api/src/main/scala/promovolve/api/EndpointRoutes.scala` — `analyze-lp` / `rewrite-sections` / `generate-layout-pair` routes
 - `modules/api/src/main/scala/promovolve/api/CreativeProcessor.scala` — Stage 5 orchestration

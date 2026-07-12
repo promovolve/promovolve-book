@@ -18,7 +18,7 @@ DData supports different consistency levels. Promovolve uses different levels de
 ## Why WriteLocal for Puts?
 
 Auction results are written frequently and losing one write is not catastrophic:
-- The next crawl cycle produces fresh results
+- The next re-auction cycle produces fresh results
 - Gossip replicates to other nodes within seconds (2s gossip interval)
 - Stale data is caught by the TTL sweep
 

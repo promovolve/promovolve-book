@@ -20,8 +20,8 @@ t=200ms  Ad renders on page
 ## Promovolve: Periodic Batch Auctions
 
 ```
-Crawl time (background, 2am daily + 5-min re-auctions):
-  t=0s     Crawler classifies page (LLM)
+Classification time (on-demand, first visitor + 5-min re-auctions):
+  t=0s     Ad tag posts page text; LLM classifies (background)
   t=1s     AuctioneerEntity starts auction
   t=3s     Bids collected (800ms timeout for taxonomy)
   t=4s     Candidates cached in DData

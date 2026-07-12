@@ -46,7 +46,7 @@ Promovolve's design choices form a coherent system where each innovation enables
 
 **Traditional**: One auction per page load.
 
-**Promovolve**: One auction per crawl (scheduled via Quartz cron) + 5-minute re-auctions.
+**Promovolve**: One auction per classification (on-demand, triggered by a page's first visitor) + 5-minute re-auctions.
 
 **Why it matters**: Decouples auction cost from traffic. Sub-millisecond serving via DData local replica. Enables multi-candidate caching.
 

@@ -1,6 +1,6 @@
 # Chapter 3: The First Auction
 
-It's 2:07am. The crawler has just finished classifying Yuki's latest article — "Autumn Foliage Hikes in Eastern Kyoto." The AuctioneerEntity for Yuki's site receives the classification: Travel (0.95), Hiking/Camping (0.85), East Asian Culture (0.70).
+It's 2:07am. A night-owl reader — jet-lagged, trip-planning, who knows — has just opened Yuki's latest article, "Autumn Foliage Hikes in Eastern Kyoto." The ad tag found nothing cached for this brand-new page, so it read the article on the spot and sent the text up for classification. Seconds later, the AuctioneerEntity for Yuki's site receives the result: Travel (0.95), Adventure Travel (0.85), Asia Travel (0.70).
 
 Three ad slots need filling. Four campaigns are in the system. The auction begins.
 
@@ -13,10 +13,10 @@ Each ranker samples from its Beta distribution — Thompson Sampling at the cate
 | Category | Distribution | Sample | Rank |
 |----------|-------------|--------|------|
 | Travel | Beta(12, 88) — proven performer | 0.14 | 1st |
-| Hiking/Camping | Beta(3, 47) — decent, some data | 0.08 | 2nd |
-| East Asian Culture | Beta(1, 1) — brand new, no data | 0.61 | 3rd (exploration!) |
+| Adventure Travel | Beta(3, 47) — decent, some data | 0.08 | 2nd |
+| Asia Travel | Beta(1, 1) — brand new, no data | 0.61 | 3rd (exploration!) |
 
-East Asian Culture ranks 3rd despite having no data — the uniform `Beta(1, 1)` distribution sampled high. This is exploration: the system will try this category to learn if it works on Yuki's site. Most of the time, the established categories win. Occasionally, a new one gets a chance.
+Asia Travel ranks 3rd despite having no data — the uniform `Beta(1, 1)` distribution sampled high. This is exploration: the system will try this category to learn if it works on Yuki's site. Most of the time, the established categories win. Occasionally, a new one gets a chance.
 
 The top 3 categories advance to bidding.
 
@@ -26,13 +26,13 @@ For each ranked category, the AuctioneerEntity asks the `CategoryBidderEntity`: 
 
 The CategoryBidderEntity fans out to all campaigns registered for that category. Each CampaignEntity evaluates whether it should bid:
 
-**Takeshi's Ryokan** (Travel, Hiking): Budget remaining? Yes ($20). Campaign active? Yes. Creative approved for this site? Yes. Bid: **$5.00 CPM**.
+**Takeshi's Ryokan** (Travel, Adventure Travel): Budget remaining? Yes ($20). Campaign active? Yes. Creative approved for this site? Yes. Bid: **$5.00 CPM**.
 
 **JR Rail Pass** (Travel): Budget remaining? Yes. Bid: **$8.00 CPM**.
 
-**Hiking Gear Co** (Hiking): Budget remaining? Yes. Bid: **$4.00 CPM**.
+**Hiking Gear Co** (Adventure Travel): Budget remaining? Yes. Bid: **$4.00 CPM**.
 
-**Kyoto Cooking Class** (Food & Drink): This campaign isn't registered for Travel, Hiking, or East Asian Culture. It doesn't bid.
+**Kyoto Cooking Class** (Food & Drink): This campaign isn't registered for Travel, Adventure Travel, or Asia Travel. It doesn't bid.
 
 Three bids collected. All above the floor price ($0.50). All pass eligibility: active status, positive budget, creative size matches at least one slot.
 
@@ -86,9 +86,9 @@ In about 4 seconds of background processing:
 4. All competitive bids passed through to serve-time selection
 5. Candidates were cached in replicated memory across the cluster
 
-No reader was involved. No page load was delayed. The entire auction happened in the background, and the results are sitting in memory, waiting.
+The night-owl reader who set it all off never felt a thing — the classify call is fire-and-forget, and her page loaded at full speed. The entire auction happened in the background, and the results are sitting in memory, waiting.
 
-Now a reader arrives.
+Now the morning readers arrive.
 
 ---
 

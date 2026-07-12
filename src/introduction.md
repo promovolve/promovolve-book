@@ -6,7 +6,7 @@ This chapter provides a concise technical overview of Promovolve's architecture 
 
 ### 1. Periodic Batch Auction
 
-Auctions happen when content is published or updated (scheduled crawl + 5-minute re-auctions), not on every page load. An LLM classifies page content into IAB categories, TaxonomyRankerEntity ranks categories by site-specific performance, and CategoryBidderEntity collects bids from eligible campaigns. Results are cached in DData.
+Auctions happen when content is first classified (on-demand classification + 5-minute re-auctions), not on every page load. An LLM classifies page content into IAB categories, TaxonomyRankerEntity ranks categories by site-specific performance, and CategoryBidderEntity collects bids from eligible campaigns. Results are cached in DData.
 
 ### 2. Multi-Candidate Caching
 

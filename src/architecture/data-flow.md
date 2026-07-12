@@ -1,14 +1,18 @@
-# Data Flow: Crawl vs Serve
+# Data Flow: Classify vs Serve
 
 Promovolve separates its workload into two distinct phases with fundamentally different performance characteristics.
 
-## Crawl Phase (Write Path)
+## Classify Phase (Write Path)
 
-The crawl phase runs on a configurable schedule (default: Quartz cron `"0 0 2 * * ?"` — 2am daily) and is the "heavy" computation path. Crawl configuration per site includes `maxDepth` (default: 2) and `concurrency` (default: 5), running on a dedicated `crawler-dispatcher` with 4 fixed threads.
+The classify phase is traffic-driven, not scheduled — there is no crawler and no cron. When a page's first visitor arrives and the serve misses, the ad tag itself extracts the live page's text and slot geometry in the browser and POSTs it to `/v1/classify-page`. The endpoint replies `202 Accepted` immediately and hands the payload to the SiteEntity, which single-flights classification per URL (concurrent visitors don't trigger duplicate LLM calls). This is the "heavy" computation path, and it never blocks a serve.
+
+Freshness is governed by a token: every serve response carries `reclassifyInMs`, computed from the publisher's content-recency window (default 48 hours, publisher-configurable). Fresh pages don't re-classify on every serve; only when the window lapses does the ad tag send text again.
 
 ```mermaid
 graph TD
-    Crawler["External Crawler<br/>(4-thread pool)"] --> Classification["Page Classification<br/>(LLM: Gemini/OpenAI/Anthropic)<br/>categories + confidence scores"]
+    AdTag["Ad Tag (browser)<br/>first visitor: extract page text + slot geometry"] --> ClassifyEP["POST /v1/classify-page<br/>(202 Accepted, fire-and-forget)"]
+    ClassifyEP --> Site["SiteEntity<br/>(single-flight per URL)"]
+    Site --> Classification["Page Classification<br/>(LLM: Gemini/OpenAI/Anthropic)<br/>IAB Content Taxonomy 3.0<br/>categories + confidence scores<br/>persisted with classifiedAt"]
     Classification --> Auctioneer["AuctioneerEntity<br/>(sharded by siteId)"]
     Auctioneer --> Taxonomy["TaxonomyRankerEntity<br/>(800ms timeout)<br/>Thompson-sampled weights, 7-day half-life<br/>site-blend threshold: 20.0, min imps: 100"]
     Auctioneer --> CatBid["CategoryBidderEntity fan-out<br/>(5 virtual shards)"]
@@ -16,6 +20,10 @@ graph TD
     CampDist --> CampResp["CampaignEntity bid responses<br/>bidCpm = max(maxCpm × multiplier, floor)"]
     Auctioneer --> ServeIndex["Candidate shortlisting → ServeIndex<br/>(DData, WriteLocal, 120-min TTL)"]
 ```
+
+The durable copy of classifications lives in `SiteEntity.pageClassifications`; the AuctioneerEntity keeps an in-memory `lastPage` map (categories, slots, `classifiedAt`) for re-auctions, reseeded at boot via `RestoreClassifications` and recovered per-URL when a `Reevaluate` misses. Beyond the first classification, the auction re-runs event-driven (campaign approve/pause, budget changes — on a 1-second debounce) with a periodic backstop.
+
+A page nobody visits never classifies — and has no impressions to sell, so no work is wasted.
 
 ## Serve Phase (Read Path)
 
@@ -39,14 +47,14 @@ graph TD
 
 ## Why Two Phases?
 
-| Concern | Crawl Phase | Serve Phase |
-|---------|-------------|-------------|
+| Concern | Classify Phase | Serve Phase |
+|---------|----------------|-------------|
 | Latency | Seconds OK | Must be < 1ms |
 | Computation | Full auction, LLM classification | Cache lookup + Beta sampling |
 | Fan-out | Many entities | Zero (local DData) |
-| Failure mode | Retry on next crawl | Serve cached candidates |
+| Failure mode | Next visitor re-triggers (single-flight releases) | Serve cached candidates |
 | Scaling | Add entity nodes | Add API nodes |
-| Dispatcher | `crawler-dispatcher` (4 threads) | Default Pekko dispatcher |
+| Trigger | First visitor / freshness token lapse | Every ad request |
 
 This separation means:
 1. **Auction complexity doesn't affect serve latency** — LLM classification and multi-entity fan-out happen in the background

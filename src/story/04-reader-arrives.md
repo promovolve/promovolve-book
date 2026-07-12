@@ -24,9 +24,9 @@ Both creatives were approved by Yuki. Both have budget remaining. Both are ready
 
 ## Step 2: Content Recency Check
 
-The system checks: is this page still fresh? The classification timestamp says it was crawled 8 hours ago. The recency window for Yuki's site is 48 hours. Eight hours is well within that — the page is fresh. Proceed.
+The system checks: is this page still fresh? The classification timestamp says it was classified 8 hours ago — the night-owl reader's visit. The recency window for Yuki's site is 48 hours. Eight hours is well within that — the page is fresh. Proceed. The ad tag's freshness token agrees, so no page text is sent, no LLM is called.
 
-If the article were from last week and hadn't been re-crawled, the candidates might have expired (TTL 120 minutes) and the response would be `204 No Content` — an empty ad slot. This is by design: stale content doesn't get monetized.
+If the article were from last week and its classification no longer fresh, the candidates might have expired (TTL 120 minutes) and the response would be `204 No Content` — an empty ad slot. This is by design: stale content doesn't get monetized.
 
 ## Step 3: The Pacing Gate
 

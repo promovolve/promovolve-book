@@ -26,7 +26,7 @@ The logic is purely financial: whoever is willing to pay the most gets the impre
 
 ## Promovolve: A Two-Phase Selection System
 
-Promovolve splits winner selection into two phases: **fair shortlisting** at auction time (when content is crawled) and **adaptive selection** at serve time (when a user arrives). This separation is the key design difference.
+Promovolve splits winner selection into two phases: **fair shortlisting** at auction time (when content is classified on-demand) and **adaptive selection** at serve time (when a user arrives). This separation is the key design difference.
 
 ### Phase 1: Auction-Time Fair Shortlisting
 

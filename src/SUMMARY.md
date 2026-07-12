@@ -32,7 +32,7 @@
 
 - [System Architecture](./architecture/overview.md)
   - [Entity Hierarchy & Cluster Roles](./architecture/entity-hierarchy.md)
-  - [Data Flow: Crawl vs Serve](./architecture/data-flow.md)
+  - [Data Flow: Classify vs Serve](./architecture/data-flow.md)
   - [The Dashboard Projection](./architecture/dashboard-projection.md)
 
 ## The Auction System

@@ -88,10 +88,10 @@ Instead of assuming linear time = linear spend, the pacing target will follow th
 
 ## Evening: A Re-Auction (7:00pm)
 
-A re-auction fires for Yuki's site. What's changed since 2am?
+A re-auction fires for Yuki's site. What's changed since the overnight auction that the night-owl reader triggered?
 
 - **JR Rail Pass campaign ran out of budget** at 4pm. Its $8 CPM bid was the highest, but its CTR was mediocre — quality-adjusted clearing kept its eCPM lower than the bid, but the volume still drained the daily budget by mid-afternoon. The pacing controller has been throttling its serves for the last hour.
-- **A new advertiser appeared**: a Kyoto pottery workshop, targeting East Asian Culture, $3 CPM.
+- **A new advertiser appeared**: a Kyoto pottery workshop, targeting Asia Travel, $3 CPM.
 
 The auction re-runs with the updated participants:
 

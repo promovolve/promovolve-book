@@ -82,7 +82,7 @@ Promovolve doesn't try to improve the traditional stack. It replaces the fundame
 
 The entire SSP/DSP/DMP chain exists because the system decided to target users. Remove that decision, and most of the machinery becomes unnecessary.
 
-Promovolve classifies page content using an LLM into IAB Content Taxonomy 2.1 categories: "This article is about Destinations, Outdoor Recreation, Cultural Tourism." Meanwhile, an advertiser says: "My product is Travel" (IAB Ad Product Taxonomy 2.0). The system automatically derives which content categories match that product using the official IAB mapping — no manual configuration. The match happens between content and product, not content and user. No user profile needed. No DMP. No cookies.
+Promovolve classifies page content using an LLM into IAB Content Taxonomy 3.0 categories: "This article is about Travel Locations, Adventure Travel, Asia Travel." Meanwhile, an advertiser hands over a landing page, and the same LLM reads it and suggests which content categories that product belongs next to — no manual configuration, though the advertiser can fine-tune the set. The match happens between content and product, not content and user. No user profile needed. No DMP. No cookies.
 
 This is the magazine model, automated. The technology that makes it work at scale — cheap, accurate LLM classification — didn't exist five years ago.
 
@@ -90,7 +90,7 @@ This is the magazine model, automated. The technology that makes it work at scal
 
 Traditional auctions run on every page load because they need to evaluate the user in real time. Promovolve doesn't need to — the content doesn't change between page loads.
 
-The auction runs when content is crawled (scheduled + re-auctions every 5 minutes). Multiple candidates per slot are cached in a replicated in-memory store (Pekko DData). When a user loads the page, the ad is already there. No network round-trip, no exchange, no 100ms wait.
+The auction runs when a page is first classified — triggered on demand by its first visitor, via the ad tag — and re-runs every 5 minutes plus on campaign events. Multiple candidates per slot are cached in a replicated in-memory store (Pekko DData). When a user loads the page, the ad is already there. No network round-trip, no exchange, no 100ms wait.
 
 Serve latency drops from 50-200ms to under 1ms.
 
@@ -128,7 +128,7 @@ These trade-offs are real and worth understanding:
 
 **No user-level targeting.** If an advertiser specifically wants to reach "women aged 25-34 in Tokyo who recently searched for hotels," Promovolve can't help. It can reach "readers of content about hotels in Tokyo," which may overlap significantly, but it's a different kind of targeting.
 
-**No real-time price discovery on every impression.** Traditional exchanges run a fresh competitive auction on every page load and reveal a market-clearing price for that exact moment. Promovolve runs the auction once per crawl (and on a 5-minute re-auction tick), so the clearing price reflects the market over a window, not the millisecond. The auction itself is competitive — quality-adjusted second-price clearing extracts honest bids — but it's batch, not realtime.
+**No real-time price discovery on every impression.** Traditional exchanges run a fresh competitive auction on every page load and reveal a market-clearing price for that exact moment. Promovolve runs the auction once per classification (and on a 5-minute re-auction tick), so the clearing price reflects the market over a window, not the millisecond. The auction itself is competitive — quality-adjusted second-price clearing extracts honest bids — but it's batch, not realtime.
 
 **Stale auction results.** Traditional RTB reflects the state of the world right now. Promovolve's cached candidates can be up to 5 minutes old (the re-auction interval). A campaign that paused 2 minutes ago might still be served until the next re-auction.
 
