@@ -34,6 +34,39 @@ nothing about any other.
 - **Block a domain** — publishers can also block by landing-page domain,
   removing every creative that links there, from any advertiser.
 
+## Trust, once earned
+
+Reviewing every creative from an advertiser you've already vetted is
+busywork, so a publisher can opt in to **auto-approval**, per site, off by
+default. The reasoning behind its shape:
+
+- **A manual approval is a statement of trust** — not just in one image,
+  but in the campaign behind it and the brand it links to. So each manual
+  approval records two *trust anchors* for the site: the campaign, and the
+  landing page's registrable domain (`shop.acme.com` and `www.acme.com`
+  are the same brand; two tenants of a shared hosting platform are not).
+  With the toggle on, a new creative matching either anchor skips the
+  queue and serves immediately, marked as auto-approved so the publisher
+  can always audit what the feature did on their behalf.
+- **Trust is consumed, never chained.** Auto-approvals mint no anchors of
+  their own — otherwise one approval could snowball across an advertiser's
+  whole portfolio via shared domains. Only a human clicking Approve widens
+  trust.
+- **A reject is evidence the inference failed.** Auto-approval is a bet
+  that past approval predicts future approval; rejecting, flagging, or
+  revoking any creative from a trusted campaign or domain settles that bet
+  the other way and withdraws the anchors. Siblings return to the manual
+  queue. Anchors can also be removed individually from the dashboard.
+- **Off by default, deliberately.** Approved demand is what teaches floor
+  prices, so widening what gets approved automatically changes a site's
+  economics. That choice belongs to the publisher, not a default. For the
+  same reason there is no retroactive grant: approvals made before the
+  feature existed mint no anchors, because the rejections that would have
+  balanced them were never recorded.
+
+Turning the toggle off pauses auto-approval without deleting the trust
+list; turning it back on restores it.
+
 ## The lifecycle rule that took a production incident to learn
 
 Pausing a campaign and *deleting* its approvals are different acts, and
@@ -44,6 +77,9 @@ deploy. The settled rule:
   on the site — pausing is leaving; on resume, every creative starts over
   as pending. This is a product decision: a publisher who approved a
   campaign in March shouldn't discover it silently resumed in July.
+  (Trust anchors are the publisher's own state and survive the pause — on
+  a site that opted into auto-approval, resume re-approves on the next
+  auction, because there the publisher *has* said they want exactly that.)
 - **Everything else keeps approvals** — budget exhaustion, category
   re-registration churn during deploys, entity restarts, re-verification.
   None of these are the advertiser leaving, so none of them may touch the
