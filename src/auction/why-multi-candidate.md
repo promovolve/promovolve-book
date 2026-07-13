@@ -19,6 +19,7 @@ Promovolve's fair selection algorithm guarantees per-campaign diversity (one cre
 
 ```
 score = sampledCTR × CPM^α
+       (full model: (sampledCTR + 2.0 × sampledFoldRate + newcomerBonus) × CPM^α)
 ```
 
 Where `sampledCTR` is drawn from `Beta(clicks + 1, non_clicks + 1)` using time-bucketed statistics (1-minute granularity, 60-minute rolling window). The exponent **α (`bidWeight`)** is publisher-configurable: α=0.3 (Discovery) lets quality dominate, α=0.5 (Balanced) is the default `sqrt(CPM)`, α=0.7 (Revenue) tilts toward higher bids.

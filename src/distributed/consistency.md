@@ -10,10 +10,10 @@ DData supports different consistency levels. Promovolve uses different levels de
 | **Append** (single candidate) | `WriteLocal` | — | — | Speed; dedup prevents issues |
 | **CPM update** | `WriteLocal` | — | — | Best-effort price refresh |
 | **FilterByCreativeIds** | `WriteLocal` | — | — | Batch cleanup |
-| **Remove** (takedown) | `WriteMajority` | 800ms | 5 (200ms backoff) | Must be durable |
-| **RemoveCampaignFromKey** | `WriteMajority` | 800ms | 5 | Must be durable |
-| **RemoveCreativeFromKey** | `WriteMajority` | 800ms | 5 | Must be durable |
-| **RemoveBySite** | `WriteMajority` | 800ms | 5 | Must be durable |
+| **Remove** (whole-key takedown) | `WriteMajority` | 800ms | 5 (200ms backoff) | Must be seen cluster-wide |
+| **RemoveCampaignFromKey** | `WriteLocal` | — | — | Rewrites the entry's candidate list; gossip carries it |
+| **RemoveCreativeFromKey** | `WriteLocal` | — | — | Same — an update, not a takedown |
+| **Remove\*BySite** (campaign/creative/advertiser) | `WriteLocal` | — | — | Fan-out of per-key updates |
 
 ## Why WriteLocal for Puts?
 
@@ -48,5 +48,5 @@ WriteLocal operations have a brief window (typically <2s, matching gossip interv
 
 These are acceptable because:
 1. Thompson Sampling already introduces per-request randomness
-2. The 15-minute RL window averages over many decisions
+2. The 5-minute periodic re-auction refreshes every entry anyway
 3. Budget and pause checks at serve time catch any "shouldn't serve" cases

@@ -28,8 +28,9 @@ ServeIndex
 ```scala
 case class ServeView(
   candidates: Vector[CandidateView],
-  version: Long,       // e.g., auction timestamp
-  expiresAtMs: Long    // epoch millis; for TTL sweep
+  version: Long,          // e.g., auction timestamp
+  expiresAtMs: Long,      // epoch millis; for TTL sweep
+  pageCategories: Set[String] = Set.empty // page's categories, for affinity learning
 ) extends CborSerializable
 ```
 
@@ -47,10 +48,10 @@ case class CandidateView(
   category: CategoryId,
   cpm: CPM,
   classifiedAtMs: Long,       // when page content was classified
-  categoryScore: Double = 0.5, // classifierConfidence × rankerWeight
-  frequencyCap: Option[Int] = None,
+  categoryScore: Double = 0.5, // Thompson-sampled CTR (0.5 = neutral prior)
   adProductCategory: Option[AdProductCategoryId] = None,
-  landingDomain: String = ""
+  landingDomain: String = "",  // for domain blocking
+  landingUrl: String = ""      // full landing URL for click-through
 ) extends CborSerializable
 ```
 
@@ -61,8 +62,11 @@ case class CandidateView(
 | Gossip interval | 2s |
 | Notify subscribers | 500ms |
 | Max delta elements | 500 |
-| Durable keys | `shard-*`, `exhausted-campaigns` |
-| Durable store | LMDB (100 MiB, 200ms write-behind) |
+| Durable keys | `shard-*`, `exhausted-campaigns`, `serve-views-*` |
+| Durable store | LMDB (1 GiB, 200ms write-behind) |
 | Pruning interval | 120s |
 
-Note: ServeIndex entries are **not** in the durable keys list — they are ephemeral and rebuilt from auctions on restart. Only shard metadata and exhausted-campaign flags are LMDB-durable.
+Note: ServeIndex entries (`serve-views-*`) **are** on the durable keys
+list — a restart restores the last written index from LMDB instead of
+serving empty slots until the next re-auction. Durability is
+write-behind (200ms batches), so it never sits on the read path.

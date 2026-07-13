@@ -106,16 +106,19 @@ A traditional exchange would never serve Campaign C. It would never get data. It
 
 ### Cold start: getting new creatives off the ground
 
-Thompson Sampling needs data to work, so Promovolve uses specific strategies for new creatives depending on the state of the candidate pool:
+Thompson Sampling needs data to work, so Promovolve gives new creatives
+two structured helps — both inside the scoring function, with no
+separate strategy switch:
 
-| Condition | Strategy | Behavior |
+| Condition | Mechanism | Behavior |
 |-----------|----------|----------|
-| All candidates have 0 impressions | **Full cold start** | Use `categoryScore ± noise` as estimated CTR — the auction's content-relevance signal bootstraps the first selections |
-| All candidates have < 10 impressions | **Warmup round-robin** | Always serve the candidate with the fewest impressions — ensures every creative gets at least 10 impressions before exploitation begins |
-| Some candidates are new, some have data | **Partial cold start** | 30% of the time, randomly pick a new creative; 70% run normal Thompson Sampling on all candidates |
-| All candidates have ≥ 10 impressions | **Standard** | Full Thompson Sampling |
+| Candidate has 0 impressions | **Cold branch** | Score from `categoryScore ± 0.15 noise` (the auction's content-relevance signal) plus a `Beta(1,3)` fold-rate prior — a sensible starting score instead of a coin flip |
+| First 50 impressions | **Newcomer bonus** | An additive +0.5 engagement bonus decaying linearly to zero, guaranteeing an exploration runway against confident incumbents |
+| Beyond that | **Standard** | Full Thompson Sampling on the creative's own posteriors |
 
-The 30% exploration rate for partial cold starts is aggressive by design — new creatives need data quickly, and Thompson Sampling's natural exploration handles the rest once they have enough impressions.
+Both mechanisms produce identically-shaped scores, so selection stays a
+single argmax at every lifecycle stage — no phase transitions, no forced
+round-robin serving a plainly wrong ad just because it's new.
 
 ### The full selection pipeline
 
@@ -159,7 +162,7 @@ In a traditional exchange, if the winner can't pay, the auction fails and the sl
 | **Pricing** | Second-price on bids | Quality-adjusted second-price — winner pays the minimum CPM that still beats the runner-up given its CTR |
 | **Reader agency** | None — readers can't influence what they see | Dog-ear pins: readers bookmark ads they want to revisit |
 | **Learning** | None — each auction is independent | Continuous — every impression updates the Beta posterior |
-| **New creative discovery** | Impossible without outbidding the incumbent | Built-in via exploration; 30% forced exploration for brand-new creatives |
+| **New creative discovery** | Impossible without outbidding the incumbent | Built-in via exploration; a decaying newcomer bonus guarantees brand-new creatives a runway |
 | **Cold start** | New advertiser must bid high to win | Round-robin warmup guarantees initial data collection |
 | **Failure handling** | Slot goes unfilled | Fall through to next-best candidate |
 | **Publisher alignment** | Optimizes for advertiser spend | Optimizes for reader engagement (CTR), weighted by spend via α |

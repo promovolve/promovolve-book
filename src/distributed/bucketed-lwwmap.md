@@ -7,7 +7,7 @@ The ServeIndex partitions entries into **32 buckets** to keep CRDT delta sizes s
 A single `LWWMap` containing all entries would produce large deltas on any change. Bucketing partitions the keyspace:
 
 ```
-bucket = abs(key.hashCode) % 32
+bucket = rotateLeft(key.hashCode, 13) & 31   // key = "siteId|slotId"
 ```
 
 Each bucket is an independent `LWWMap`. An update to bucket 7 only produces a delta for bucket 7.

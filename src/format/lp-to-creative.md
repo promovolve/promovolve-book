@@ -121,7 +121,7 @@ After save, the API sends a `Process` command to the [`CreativeProcessor`](../ar
 
 The pipeline has obvious failure points: an LP that never finishes loading, Gemini returning malformed JSON, an image URL that 403s, R2 timing out. Each stage handles these:
 
-- **LP fetch timeouts.** Playwright runs with a 30-second navigation timeout. On timeout, the analyzer returns an empty result and the dashboard surfaces "couldn't read this URL" with a retry button.
+- **LP fetch timeouts.** Playwright runs with a 15-second navigation timeout plus a 10-second load-state wait. On timeout, the analyzer returns an empty result and the dashboard surfaces "couldn't read this URL" with a retry button.
 - **Gemini 5xx / rate limits.** Both rewrite and layout calls go through `HttpRetryPolicy.withRetry` — up to 5 attempts, capped exponential backoff with jitter, retries on 408/429/500/502/503/504 plus network failures. The shared `GeminiRateLimiter` token bucket keeps total RPM under the project's quota across all Gemini callers (rewrite, layout, taxonomy classification, category verification).
 - **Image download failures.** A single failed image doesn't fail the creative; the page reference is left empty and the page renders without that image.
 - **CreativeProcessor crashes mid-pipeline.** On startup, the actor scans `CreativeRepo` for creatives with `pages_json` set but `s3_key` empty (the marker for "stage 5 didn't finish") and re-runs from where the previous attempt died. A restart while the pipeline is mid-flight doesn't lose work.

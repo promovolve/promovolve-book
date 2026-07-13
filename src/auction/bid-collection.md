@@ -30,7 +30,7 @@ To understand bid collection, it helps to see the full chain that connects an ad
 
 ## CategoryBidderEntity
 
-Each `(category, siteId)` pair uses **5 virtual shards** to distribute load. The shard is selected by `hash(siteId) % 5`, so the actual entity key is `category|siteId|shardIndex`.
+Each category uses **5 virtual shards** to distribute load. The shard is selected by `hash(siteId) % 5`, so the actual entity key is `category|shardIndex` — the siteId picks the shard but is not part of the key.
 
 ## CampaignDistributor
 
@@ -54,13 +54,12 @@ The advertiser bids their true value. There's no bid shading or multiplier — t
 
 A CampaignEntity will not respond if any of these checks fail:
 
-1. **Category mismatch**: The page category is not in the campaign's `categories` set — this is the primary filter. The campaign's categories are its declared Content Taxonomy 3.0 target set (Gemini-suggested from the landing page, advertiser-editable). Matching is **exact**: `state.categories.contains(pageCategory)`
+1. **Category mismatch**: The page category is not in the campaign's category set — this is the primary filter. The campaign's categories are its declared Content Taxonomy 3.0 target set (Gemini-suggested from the landing page, advertiser-editable). Matching is **exact**: `effectiveCategories.contains(pageCategory)`
 2. **Category blocklisted**: The category is in the campaign's `categoryBlocklist` (explicit exclusions)
 3. **Status paused**: Campaign `status != Active`
 4. **Budget exhausted**: `dailyBudget - (spendToday + bufferedSpend) <= 0`
 5. **Day-aware check**: If the calendar day changed since `lastResetInstant`, the budget is treated as fresh (reset happens lazily)
-6. **Site blocklisted**: Publisher's site is on the advertiser's `siteBlacklist`
-7. **No matching sizes**: None of the campaign's `allowedSizes` fit the slot's `AdSlotConfig(width, height)`
+6. **Site not allowed**: The campaign has a non-empty `siteAllowlist` that doesn't include this site (`SiteNotAllowed`). The advertiser's *domain blocklist* is a separate mechanism enforced at the AdServer via DData, not here — and creative↔slot size matching also happens at serve time, not in the campaign.
 
 ## Aggregation Rules
 
@@ -84,7 +83,7 @@ Candidate(
   creativeHash: String,
   landingDomain: String,
   preApproved: Boolean,
-  frequencyCap: Option[Int],
-  adProductCategory: Option[AdProductCategoryId]
+  adProductCategory: Option[AdProductCategoryId],
+  maxCpm: CPM                            // campaign ceiling, for floor sweeps
 )
 ```

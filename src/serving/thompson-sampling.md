@@ -9,9 +9,9 @@ For each serve request (after pacing gate and frequency cap filtering):
 ```
 For each candidate c in the slot:
   stats = creativeStats[c.creativeId]  // 1-minute bucketed, 60-min window
-  imps = stats.totalImpressions
-  clicks = stats.totalClicks
-  folds = stats.totalFolds
+  imps = stats.impressions
+  clicks = stats.clicks
+  folds = stats.folds
 
   if imps == 0:
     sampledCTR  = categoryScore + random(-0.15, +0.15)

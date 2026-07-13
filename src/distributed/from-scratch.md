@@ -83,8 +83,9 @@ Pekko's **Distributed Data (DData)** implements CRDTs with a gossip protocol. Ev
 Promovolve's **ServeIndex** stores the auction results that the serve path needs:
 
 ```
-Key: "site-123|slot-banner-top|bucket-7"
-Value: LWWMap of creative candidates
+DData map: "serve-views-site-123-7"        ← bucket lives in the MAP name
+Entry key: "site-123|slot-banner-top"
+Value: creative candidates
   "creative-abc" → ServeView(assetUrl, cpm, ctr_stats, expires_at, ...)
   "creative-def" → ServeView(...)
 ```
@@ -113,11 +114,12 @@ Strong consistency would give you a guarantee you don't need, at a cost (leader 
 
 One problem with LWWMap: if you put thousands of entries in a single map, every gossip cycle transmits the entire delta (all changes since last sync). With frequent updates across many creatives, deltas grow large.
 
-Promovolve splits each namespace into **32 buckets** by hashing the key:
+Promovolve splits each namespace into **32 buckets** by hashing the
+composite `"site|slot"` key:
 
 ```
-bucket = hash(creativeId) % 32
-key = "site-123|slot-banner|bucket-7"
+bucket = rotateLeft(("site-123|slot-banner").hashCode, 13) & 31
+map    = "serve-views-site-123-" + bucket   // entry key stays "site|slot"
 ```
 
 Each bucket is a separate LWWMap. An auction that updates 10 creatives touches maybe 8-10 buckets, not all 32. Gossip only transmits the buckets that changed. This keeps delta sizes small and gossip efficient.
@@ -134,9 +136,9 @@ The write succeeds immediately on the local node. Gossip propagates it. If the l
 
 This is the right trade-off for the hot path. Auction results are ephemeral and refreshed frequently. Speed matters more than durability.
 
-**Deletes (Remove campaign, Remove creative): `WriteMajority`**
+**Whole-key takedowns (`Remove`): `WriteMajority`**
 
-Removing a creative should be seen by all nodes quickly — you don't want a paused campaign's ad to keep serving because one node missed the delete. `WriteMajority` waits for acknowledgment from a majority of nodes (e.g., 2 out of 3) before confirming.
+Removing a slot's entry outright should be seen by all nodes quickly — you don't want a taken-down ad to keep serving because one node missed the delete. `WriteMajority` waits for acknowledgment from a majority of nodes (e.g., 2 out of 3) before confirming. (The finer-grained removals — a single campaign or creative pruned out of a key — ride `WriteLocal` like other updates: they rewrite the entry's candidate list, and gossip carries the new version.)
 
 If `WriteMajority` times out (800ms), Promovolve retries up to 5 times with 200ms backoff. Removing an ad that shouldn't serve is more important than speed.
 
@@ -148,7 +150,13 @@ DData is in-memory. If a node restarts, its local replica is empty. What happens
 
 **In a single-node cluster (development)**: The data is gone. The next `PeriodicReauction` timer (within 5 minutes) re-runs auctions and repopulates the ServeIndex. During the gap, the serve path returns `NoContent` (HTTP 204) — the ad slot is empty. Not ideal, but bounded.
 
-Promovolve deliberately does **not** persist ServeIndex to disk (unlike the `shard-*` keys that use LMDB). Persisting the hot serve path would add disk I/O to every auction write, which defeats the purpose of in-memory state for sub-millisecond reads. The 5-minute recovery window is an acceptable trade-off.
+The ServeIndex is also on the LMDB durable-keys list (`serve-views-*`,
+alongside the `shard-*` sharding metadata), so even a full-cluster
+restart comes back with the last written index instead of an empty one.
+Durability is write-behind (batched to disk every 200ms off the hot
+path), so reads stay in-memory and sub-millisecond; the periodic
+re-auction remains the backstop that refreshes anything the write-behind
+missed.
 
 ## The Full Picture
 

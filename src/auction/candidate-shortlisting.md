@@ -48,9 +48,9 @@ CandidateView(
   cpm: CPM,
   classifiedAtMs: Long,      // when the page content was classified
   categoryScore: Double,     // classifierConfidence × rankerWeight (default 0.5)
-  frequencyCap: Option[Int],
   adProductCategory: Option[AdProductCategoryId],
-  landingDomain: String
+  landingDomain: String,
+  landingUrl: String                     // full landing URL for click-through
 )
 ```
 

@@ -33,8 +33,8 @@ From the AdServer source code, the exact order of operations:
    → Pacing gates VOLUME, not CHOICE
 
 6. Thompson Sampling Selection
-   → Cold start strategy selection (full cold / warmup / partial / standard)
-   → Score: sampledCTR × CPM^α
+   → Cold branch (0 impressions): category score ± exploration noise
+   → Warm: score = (sampledCTR + 2.0 × sampledFold + newcomerBonus) × CPM^α
    → Select argmax
 
 7. Budget Reservation

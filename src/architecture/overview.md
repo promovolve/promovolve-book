@@ -24,7 +24,7 @@ graph TB
             Evt["Events"]
         end
         DData["DData: ServeIndex, PacingConfig, Blocklist<br/>Replicated across all nodes via gossip<br/>Durable: LMDB for shard-* and exhausted-*"]
-        PG["PostgreSQL: durable_state, snapshot tables<br/>20 connections, 5 min pool"]
+        PG["PostgreSQL: durable_state, snapshot tables<br/>20 connections, 5s acquire timeout"]
     end
 ```
 
@@ -51,7 +51,7 @@ From `application.conf`:
 | Notify subscribers interval | 500ms |
 | Max delta elements | 500 |
 | Durable keys | `shard-*`, `exhausted-campaigns` |
-| Durable store | LMDB (100 MiB map, 200ms write-behind) |
+| Durable store | LMDB (1 GiB map, env-overridable via `DDATA_LMDB_MAP_SIZE`; 200ms write-behind) |
 | Pruning interval | 120s (dissemination: 300s) |
 
 ## Key Design Decisions

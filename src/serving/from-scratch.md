@@ -98,6 +98,11 @@ Promovolve's scoring formula balances both:
 score = sampledCTR × CPM^α
 ```
 
+(That's the teaching version. The full production score adds two more
+engagement terms — a fold-rate posterior and a decaying newcomer bonus —
+see [Thompson Sampling](./thompson-sampling.md); the shape of the
+argument is identical.)
+
 Why `CPM^α` instead of just `CPM`? The exponent α (publisher-tunable, default 0.5) compresses the CPM range so a creative has to perform well to win consistently — you can't just outbid everyone with a terrible ad.
 
 Consider two creatives at the default α=0.5:
@@ -114,17 +119,23 @@ This aligns publisher and advertiser incentives: the publisher gets revenue AND 
 
 When a creative has zero impressions, its distribution is `Beta(1, 1)` — uniform. It can sample anywhere from 0 to 1. This gives it a natural exploration boost, but it's random.
 
-Promovolve adds structured cold start strategies:
+Promovolve structures the cold start with two mechanisms, both inside
+the scoring function itself (no separate strategy switch):
 
-**Full cold start** (all creatives have 0 impressions): Use the category score from the auction as a prior, plus small random noise. This bootstraps from the content classification — a travel ad on a travel page starts with a reasonable guess.
+**Zero impressions**: instead of sampling the uninformative uniform, the
+creative scores from the **category score the auction assigned it** —
+the Thompson-sampled CTR of its category on this kind of page — plus
+small exploration noise (±0.15). A travel ad on a travel page starts
+from a reasonable guess, not a coin flip.
 
-**Warmup** (all creatives have fewer than 10 impressions): Round-robin by impression count. The creative with the fewest impressions goes next. This ensures every creative gets a minimum number of trials before Thompson Sampling takes over.
+**First 50 impressions**: an additive **newcomer bonus** (0.5, decaying
+linearly to zero) keeps a fresh creative competitive against established
+ones while its own posterior is still wide, so it accumulates real
+evidence instead of being starved by an incumbent's tight distribution.
 
-**Partial cold start** (mix of new and established creatives): New creatives get a 30% exploration boost — they're selected with epsilon-greedy probability even if their sample is low.
-
-**Steady state** (all creatives have 10+ impressions): Pure Thompson Sampling. The distributions are informative enough to drive good decisions.
-
-These strategies are in `ThompsonSampling.scala`, specifically the `select()` method.
+After that, the posteriors are informative enough that pure Thompson
+Sampling drives selection. Both mechanisms live in
+`ThompsonSampling.scoreCandidate()`.
 
 ## Time-Bucketed Statistics
 
@@ -169,9 +180,9 @@ The pacing gate runs **before** Thompson Sampling. This is important: if the pac
 | Concept | File | Key method |
 |---------|------|-----------|
 | Beta sampling (Marsaglia-Tsang) | `ThompsonSampling.scala` | `sampleBeta()` |
-| Score = sampledCTR × CPM^α | `ThompsonSampling.scala` | `cpmScore()` / `scoreCandidate()` |
-| Cold start strategies | `ThompsonSampling.scala` | `select()` |
-| Time-bucketed creative stats | `AdServer.scala` | `CreativeStats` |
-| Pacing gate before TS | `SelectionLogic.scala` | `shouldServe()` then `select()` |
+| Score = engagement × CPM^α | `ThompsonSampling.scala` | `cpmScore()` / `scoreCandidate()` |
+| Cold start + newcomer bonus | `ThompsonSampling.scala` | `scoreCandidate()` |
+| Time-bucketed creative stats | `Protocol.scala` | `CreativeStats` |
+| Pacing gate before TS | `PacingStrategy.scala` / `AdServer.scala` | `shouldServe()`, then selection |
 
 The next chapters cover each of these components in detail with exact formulas and configuration values.

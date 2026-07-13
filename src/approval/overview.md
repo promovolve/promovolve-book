@@ -35,7 +35,7 @@ The AuctioneerEntity shortlists multiple candidates per ad slot and sends them t
 
 ### 2. AdServer determines actual approval status
 
-Instead of relying on the `preApproved` flag (which comes from a probabilistic Cuckoo filter and can have false positives), the AdServer queries the ServeIndex to see which creatives are *actually* serving:
+Instead of relying on the `preApproved` flag (which comes from a probabilistic Cuckoo filter (in the misleadingly-named `BloomFilter.scala` — rejections must be *deletable* for revoke/unreject, which a true Bloom filter can't do) and can have false positives), the AdServer queries the ServeIndex to see which creatives are *actually* serving:
 
 ```
 existingCreativeIds =
@@ -138,13 +138,13 @@ The creative begins serving to readers on the next page load.
 
 The publisher reviews a pending creative and rejects it:
 
-1. Update AdvertiserEntity with `ApprovalStatus.Rejected` — recorded in a Bloom filter so the creative won't be re-submitted in future auctions for this site
+1. Update AdvertiserEntity with `ApprovalStatus.Rejected` — recorded in a Cuckoo filter so the creative won't be re-submitted in future auctions for this site
 2. Remove from ServeIndex (if it was somehow there)
 3. Call `rejectAndPromote` to advance the queue to the next candidate
 4. If the queue is exhausted (no more candidates), trigger a re-auction so other campaigns can fill the slot
 5. Broadcast SSE event: `rejected`
 
-Rejection is permanent for this site — the Bloom filter prevents the same creative from appearing in future pending queues.
+Rejection is permanent for this site — the Cuckoo filter prevents the same creative from appearing in future pending queues.
 
 ### Revoke
 

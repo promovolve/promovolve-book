@@ -48,9 +48,11 @@ Reduces to Case 1 since `shape + 1 ≥ 1`.
 ## Numerical Stability
 
 The implementation handles edge cases:
-- α or β very small (< 0.01): clamped to avoid division by zero in power trick
-- Very large shape: Marsaglia-Tsang is naturally stable
-- Sample = 0 or 1: clamped to [ε, 1-ε] to avoid log(0) in downstream scoring
+- Degenerate draw (`x + y == 0`): returns 0.5 rather than dividing by zero
+- Very large shape: Marsaglia-Tsang is naturally stable (with a squeeze
+  fast-accept — `u < 1 − 0.0331·x⁴` — before the exact log test)
+- Cold-start scores are floored at 0.001 downstream, so a zero sample
+  never produces a zero score
 
 ## Performance
 

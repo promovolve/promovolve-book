@@ -47,6 +47,6 @@ Entries are partitioned into **32 buckets** (power-of-2) by hash of the key. Eac
 ServeIndex supports granular removal:
 - `RemoveCampaignFromKey`: Remove all candidates from a specific campaign across slots
 - `RemoveCreativeFromKey`: Remove a specific creative across all slots
-- `RemoveBySite`: Batch removal for all slots on a site
+- `RemoveCampaignBySite` / `RemoveCreativeBySite` / `RemoveAdvertiserBySite`: batch removal across all of a site's slots
 
-All removals use `WriteMajority` with retries for durability.
+The whole-key `Remove` uses `WriteMajority` with retries; the granular per-key and by-site removals use `WriteLocal` (they rewrite entries, and gossip carries the new version).

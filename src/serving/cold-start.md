@@ -1,54 +1,42 @@
-# Cold Start Strategies
+# Cold Start
 
-New candidates enter the system with zero impressions. Promovolve uses three structural strategies depending on the state of the candidate pool — plus a continuous **newcomer bonus** that boosts under-sampled creatives across all phases.
+New candidates enter the system with zero impressions. Promovolve handles
+them with two mechanisms, both inside the scoring function itself — there
+is no separate strategy switch, no forced warmup phase, and no
+epsilon-greedy branch. Every request scores every candidate the same way;
+what changes is where a cold candidate's numbers come from.
 
-## Strategy 1: Full Cold Start
+## Mechanism 1: The Cold Branch (zero impressions)
 
-**Condition**: All candidates in the slot have 0 impressions.
-
-**Algorithm**: Use `categoryScore` from the auction phase as a prior, with noise:
-
-```
-sampledCTR = categoryScore + random(-0.1, +0.1)
-score = sampledCTR × CPM^α
-```
-
-The `categoryScore = classifierConfidence × rankerWeight` provides a signal from the TaxonomyRankerEntity. The ±0.1 noise ensures different candidates are selected across requests even when they have identical category scores.
-
-## Strategy 2: Warmup Phase
-
-**Condition**: All candidates have fewer than **10 impressions** (`WarmupImpressions = 10`).
-
-**Algorithm**: **Round-robin** — always select the candidate with the fewest impressions:
+A candidate with no impression history can't sample a CTR posterior — its
+`Beta(1, 1)` would be pure noise. Instead, the cold branch of
+`scoreCandidate` substitutes the best signal available:
 
 ```
-select = argmin(candidate.impressions)
+sampledCTR = max(0.001, categoryScore + random(-0.15, +0.15))
+sampledFold = sampleBeta(1, 3)     // Beta(1,3), mean 0.25
 ```
 
-No Thompson Sampling runs during warmup. This guarantees every candidate gets at least 10 impressions before exploitation begins.
+The `categoryScore` is the Thompson-sampled CTR of the candidate's
+*category* on this kind of page, assigned during the auction by the
+TaxonomyRankerEntity — so a travel ad on a travel page starts from how
+travel ads have performed on travel pages, not from a coin flip. The
+±0.15 jitter keeps identical category scores from producing deterministic
+selection, and the clamp keeps a low score minus jitter from going
+negative.
 
-**Why 10?** At 10 impressions with a typical 2-5% CTR, the expected number of clicks is 0-1. The Beta distribution `Beta(1, 10)` or `Beta(2, 9)` has sufficient shape to distinguish different CTRs but is still wide enough for continued exploration after warmup ends.
+The fold rate has no category-level prior, so it samples from a
+`Beta(1, 3)` cold prior (mean 0.25). This matters more than it looks:
+without a fold sample, a cold creative's engagement could never beat a
+warm fold-rich one's `sampledCTR + 2.0 × foldRate` — the exploration
+mechanism would silently fail for exactly the candidates that need it.
+(A uniform `Beta(1, 1)` prior was tried first and over-rewarded cold
+creatives — an expected `2.0 × 0.5 = 1.0` engagement head start.)
 
-## Strategy 3: Partial Cold Start
+## Mechanism 2: Newcomer Bonus (first 50 impressions)
 
-**Condition**: Some candidates have data (≥ 10 impressions) and some are new (0 impressions).
-
-**Algorithm**: **Epsilon-greedy** with `ExplorationRate = 0.30`:
-
-```
-if random() < 0.30:
-    select randomly from cold candidates (impressions == 0)
-else:
-    run Thompson Sampling on all candidates
-```
-
-The 30% rate is aggressive by design — new candidates need data quickly. Once they accumulate impressions, Thompson Sampling's Beta posterior handles exploration naturally.
-
-**Note**: When Thompson Sampling runs in the else branch, it runs on **all** candidates including cold ones. Cold candidates use `categoryScore + random(-0.15, +0.15)` as their sampled CTR, **plus a fold rate sampled from `Beta(1, 1)`** (uniform [0, 1]) so cold creatives have a real fold component instead of a hardcoded zero. Without the fold prior, a cold creative's `engagement = sampledCTR + 0` could never beat a warm fold-rich one's `sampledCTR + 2.0 × foldRate` — the dominant exploration mechanism would silently fail. They still benefit from the [Newcomer Bonus](#newcomer-bonus-decaying-additive-boost) on top.
-
-## Newcomer Bonus: Decaying Additive Boost
-
-The three strategies above are *structural* — they redirect selection on specific conditions. Cutting across all of them is a **continuous additive bonus** applied during the score combiner that tilts the auction toward creatives with few impressions:
+Cutting across cold and warm scoring is a **continuous additive bonus**
+that tilts selection toward creatives with few impressions:
 
 ```
 engagement = sampledCTR + FoldWeight × sampledFold + newcomerBonus(impressions)
@@ -61,36 +49,37 @@ With `NewcomerBoost = 0.5` and `NewcomerDecayImpressions = 50`, the curve is:
 | Impressions | Bonus | Effect |
 |---:|---:|---|
 | 0  | +0.50 | Brand new — full boost |
-| 10 | +0.40 | Past forced warmup, still strongly favored |
+| 10 | +0.40 | Early evidence accumulating, still strongly favored |
 | 25 | +0.25 | Half-faded |
 | 50 | 0.00  | Bonus exhausted — competing on its own posteriors |
 | 100+ | 0.00 | No boost; warm creative |
 
-This is a UCB (Upper Confidence Bound) flavored adjustment grafted onto Thompson Sampling. Pure TS already over-prefers high-variance candidates, but in practice the variance gain from a small impression count isn't always enough to outpace a confident warm creative with established stats. The decaying bonus closes that gap explicitly: brand new creatives get a guaranteed exploration runway, and the boost fades smoothly so the system isn't permanently subsidizing newcomers that turned out to be poor performers.
+This is a UCB (Upper Confidence Bound) flavored adjustment grafted onto
+Thompson Sampling. Pure TS already over-prefers high-variance candidates,
+but in practice the variance gain from a small impression count isn't
+always enough to outpace a confident warm creative with established
+stats. The decaying bonus closes that gap explicitly: brand new
+creatives get a guaranteed exploration runway, and the boost fades
+smoothly so the system isn't permanently subsidizing newcomers that
+turned out to be poor performers.
 
-The bonus continues past `WarmupImpressions = 10` (where the forced round-robin ends) so the creative gets help during the early exploitation period when its posterior is wide but no longer being protected by the warmup phase.
+## Why No Forced Warmup?
 
-## Strategy Selection Flow
-
-```
-Are all candidates at 0 impressions?
-  └── Yes → Full Cold Start (categoryScore ± 0.1 noise)
-  └── No  → Are all candidates under 10 impressions?
-              └── Yes → Warmup (round-robin by fewest impressions)
-              └── No  → Are some candidates at 0 impressions?
-                          └── Yes → Partial Cold Start (30% epsilon-greedy)
-                          └── No  → Standard Thompson Sampling
-```
+An earlier design sketched a round-robin warmup phase (every candidate
+gets N impressions before TS takes over). It was never needed: the
+category-score prior gives cold candidates a *sensible* starting score
+rather than a random one, and the newcomer bonus guarantees the runway a
+round-robin would have provided — without ever serving a plainly wrong
+ad just because it's new. Selection stays a single argmax over
+identically-shaped scores at every lifecycle stage.
 
 ## Key Constants
 
 | Constant | Value | Location |
 |----------|-------|----------|
-| `ExplorationRate` | 0.30 | ThompsonSampling.scala |
-| `WarmupImpressions` | 10 | ThompsonSampling.scala |
 | `NewcomerBoost` | 0.5 | ThompsonSampling.scala |
 | `NewcomerDecayImpressions` | 50 | ThompsonSampling.scala |
 | `FoldWeight` | 2.0 | ThompsonSampling.scala |
 | Cold CTR noise range | ±0.15 | ThompsonSampling.scala |
-| Cold fold prior | `Beta(1, 1)` | ThompsonSampling.scala |
-| Full cold CTR noise range | ±0.1 | ThompsonSampling.scala |
+| Cold CTR floor | 0.001 | ThompsonSampling.scala |
+| Cold fold prior | `Beta(1, 3)` | ThompsonSampling.scala |

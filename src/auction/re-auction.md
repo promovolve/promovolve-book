@@ -53,7 +53,7 @@ Only these events warrant actual removal from ServeIndex:
 - Campaign ad product category changed (may violate publisher blocklist)
 - Advertiser suspended
 
-These use `WriteMajority` consistency with up to 5 retries and 200ms initial backoff.
+These per-campaign/creative/advertiser removals use `WriteLocal`; only the whole-key `Remove` uses `WriteMajority` with up to 5 retries and 200ms initial backoff.
 
 ## Content Cleanup
 

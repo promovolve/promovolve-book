@@ -38,7 +38,7 @@ graph TD
     FreqCap --> Rate["Rate Tracking<br/>(synchronous EMA, 1s window, α=0.3)"]
     Rate --> Pacing["Pacing Gate (PI control)<br/>aggregate budget from CachedSpendInfo<br/>throttle probability 0.0–0.99"]
     Pacing -->|"random() < throttle"| Skip["Skip (204)"]
-    Pacing -->|pass| TS["Thompson Sampling Selection<br/>sample Beta(clicks+1, non_clicks+1)<br/>score = sampledCTR × CPM^α<br/>argmax"]
+    Pacing -->|pass| TS["Thompson Sampling Selection<br/>sample Beta(clicks+1, non_clicks+1)<br/>score = (sampledCTR + 2.0 × sampledFoldRate + newcomerBonus) × CPM^α<br/>argmax"]
     TS --> Budget["Budget Reservation<br/>CampaignEntity.Reserve +<br/>AdvertiserEntity.GetBudgetStatus"]
     Budget -->|failure| Next["Try next-best by Thompson score"]
     Budget -->|success| Serve["Serve ad"]

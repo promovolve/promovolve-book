@@ -4,19 +4,21 @@ Promovolve ensures diversity through two mechanisms: the auction-time fair selec
 
 ## Auction-Time Diversity
 
-The candidate shortlisting algorithm (in AuctioneerEntity) guarantees per-campaign representation:
+Diversity is enforced in two stages. At **auction time** the
+AuctioneerEntity produces a campaign-fair ordered candidate list — no
+cap, no slot counting:
 
 ```
-1. Group candidates by campaign
-2. Pick best creative per campaign (by CPM)
-3. If #campaigns ≥ #slots:
-     Take top campaigns by CPM → one creative each
-4. Else:
-     Each campaign gets 1 slot (guaranteed)
-     Fill remaining slots with next-best creatives
+1. Deduplicate candidates by creative
+2. Pick each campaign's best creative (by CPM) — those go first
+3. Append the remaining creatives after them
 ```
 
-This means 3 campaigns competing for 3 slots each get exactly 1 slot, rather than a single high-CPM campaign filling all 3.
+Then at **serve time**, the batch assignment walks a page's slots
+biggest-first and excludes campaigns (and creatives) already placed on
+the page. That's where the guarantee lands: 3 campaigns competing for a
+3-slot page each get exactly 1 slot, rather than a single high-CPM
+campaign filling all 3.
 
 ## Serve-Time Aggregate Pacing
 
@@ -57,7 +59,7 @@ Publishers can configure per-site ad product category blocklists:
 adProductBlocklist: Set[AdProductCategoryId]
 ```
 
-Distributed via DData (`AdProductBlocklistKey`), this filter runs at auction time to exclude entire categories of ads (e.g., gambling, alcohol) from the publisher's inventory.
+Distributed via DData (`AdProductBlocklistKey`), this filter runs in the serve path to exclude entire categories of ads (e.g., gambling, alcohol) from the publisher's inventory.
 
 ## Creative Deduplication
 
