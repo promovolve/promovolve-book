@@ -2,7 +2,7 @@
 authors = ["Promovolve Team"]
 language = "en"
 src = "src"
-title = "Promovolve: Ad Auction Algorithms & Architecture"
+title = "Promovolve: The Design of a Tracking-Free Ad Network"
 
 [build]
 build-dir = "book/en"
@@ -10,9 +10,4 @@ build-dir = "book/en"
 [output.html]
 default-theme = "navy"
 preferred-dark-theme = "navy"
-additional-js = ["mermaid.min.js", "mermaid-init.js"]
-
-[preprocessor]
-
-[preprocessor.mermaid]
-command = "mdbook-mermaid"
+git-repository-url = "https://github.com/promovolve/promovolve-book"
