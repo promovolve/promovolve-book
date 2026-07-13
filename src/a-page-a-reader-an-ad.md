@@ -58,7 +58,7 @@ fresh, pulls the cached candidate pool from a local replica, and lets its
 pacing controller decide whether this impression should even be spent — a
 campaign's budget must last the whole day, not just the morning.
 
-Then it samples. Each candidate's click and expand history is a pair of Beta
+Then it samples. Each candidate's click and dog-ear history is a pair of Beta
 distributions; each candidate draws a plausible engagement rate, multiplies
 by a dampened function of its bid, and the highest draw wins the slot — one
 campaign at most per page. The winner's budget is reserved, the price is set
@@ -67,11 +67,12 @@ the creative and its tracking URLs.
 
 ## The reader answers back
 
-The ad sits folded in the page, magazine-cover small. The reader taps; it
+The ad sits collapsed in the page, magazine-cover small. The reader taps; it
 expands into a swipeable spread — cover, story, call to action. That expand
-is a *fold* event, the strongest quality signal the system has. If the
-reader wants the ad back later, they fold its corner — a dog-ear — and their
-own browser remembers it. Next time they meet that advertiser on any page of
+*is* the click in this format — the reader chose to open the magazine. If
+the reader wants the ad back later, they fold its corner — a dog-ear, the
+*fold* event, the strongest quality signal the system has — and their own
+browser remembers it. Next time they meet that advertiser on any page of
 the site, the bookmarked creative is served, free, with no auction and no
 learning: the system refuses to bill or optimize a moment the reader chose.
 

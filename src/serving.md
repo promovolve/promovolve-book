@@ -42,8 +42,9 @@ No exploration schedule, no epsilon, no phases: confidence itself allocates
 the experiments, and as data accumulates the draws narrow and the best
 creative simply wins most often.
 
-Folds are weighted 2× because opening the magazine is a stronger signal
-than a click, and more common — clicks alone would starve the model.
+Clicks here are magazine-opens — in this format the click *is* the expand.
+Folds are dog-ears, weighted 2× because a reader bookmarking the ad is a
+stronger signal than one merely opening it.
 
 The exponent **α** is the publisher's one tuning knob (`bidWeight`): 0.5 by
 default, so a $10 bid beats a $1 bid by ~3.2×, not 10× — price matters, but
@@ -76,7 +77,8 @@ time, where it can't be gamed.
 
 The winner's budget is reserved before the response is sent, and the
 impression is recorded server-side at selection — billing does not depend on
-a tracking pixel surviving the reader's browser. Clicks, folds, and dog-ear
-events arrive later through tracking endpoints and update the Beta windows.
+a tracking pixel surviving the reader's browser. Clicks (expands), folds
+(dog-ears), and CTA events arrive later through tracking endpoints and
+update the Beta windows.
 Dog-eared re-encounters update none of this: they live in separate counters,
 excluded from learning, spend, and reporting's primary metrics.
