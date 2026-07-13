@@ -20,11 +20,14 @@ input is a URL, not a zip of banner assets.
    verbatim-sensitive details (prices, phone numbers) are carried through
    unchanged rather than paraphrased.
 
-3. **Rendering and verification.** The creative is rendered headlessly,
-   uploaded to object storage (Cloudflare R2, served through the CDN), and
-   then *verified* by a vision model: does the rendered result actually look
-   like a coherent ad — text legible, image sensible, nothing overflowing?
-   Failures go back around the loop instead of into the auction.
+3. **Rendering and verification.** The creative is rendered headlessly and
+   uploaded to object storage (Cloudflare R2, served through the CDN). An
+   LLM then verifies it against two questions: does the ad actually match
+   its declared content categories, and is it brand-safe — no adult,
+   violent, or hateful content? The check reads the authored text where it
+   exists and falls back to the rendered image only when it doesn't; the
+   verdict updates the creative's verification and safety status and
+   auto-derives its target categories.
 
 ## Color is code, not model output
 

@@ -37,10 +37,12 @@ cross-category comparison.
 
 ## Edge cases
 
-- **Exploration serves price at the floor.** A zero-history creative that
-  wins on its cold-start draw pays the floor CPM, not a mean-derived price —
-  it has no meaningful posterior to price against, and charging full freight
-  for an experiment would tax exploration.
+- **Exploration usually prices at the floor.** A zero-history winner is
+  priced by the same mean formula, using its cold-prior engagement — the
+  category affinity, the fold prior, and the newcomer bonus. Because the
+  bonus inflates its engagement, the inverted price typically clamps down
+  to the floor; a cold winner facing a strong same-category runner-up can
+  still clear above it.
 - **No runner-up → floor.** A lone candidate pays the floor. (What stops
   floors from collapsing in a one-bidder market is the floor optimizer —
   see [Floor Optimization](./floors.md) — which pegs the floor to a lone

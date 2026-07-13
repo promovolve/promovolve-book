@@ -20,9 +20,11 @@ agent mostly learned noise. What replaced it is controlled measurement:
    clearing prices. Revenue is the only honest objective; anything upstream
    of it can be gamed by the very systems the floor interacts with.
 2. **Exploit.** Take the argmax and hold it for a longer exploitation
-   period. Ties within tolerance resolve to the *lower* floor (fill rate is
-   worth more than a cosmetic floor), and a minimum-impressions guard keeps
-   a lucky low-traffic candidate from winning on three data points.
+   period. Ties within tolerance resolve to the *higher* floor — the same
+   revenue on fewer impressions, and more robust if the dominant bidder's
+   value drifts up. The optimizer only fails open to the lowest floor when
+   evidence is missing, and a minimum-impressions guard keeps a lucky
+   low-traffic candidate from winning on a handful of data points.
 3. **Repeat.** Markets drift; the cycle re-runs continuously.
 
 ## Per-category floors

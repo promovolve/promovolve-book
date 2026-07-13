@@ -14,15 +14,16 @@ pool**, not a winner:
 1. **Demand lookup.** The page's categories (with ancestor expansion) are
    resolved against `CategoryBidderEntity` actors — the registry of which
    campaigns bid on which categories. A CPM threshold keeps only competitive
-   bids.
+   bids, and each category contributes at most its top ~50 campaigns by CPM.
 2. **Bid collection.** Each eligible campaign's entity is asked for its
    creatives and current bid. Campaigns apply their own filters here — a
    site allowlist, if the advertiser restricted where they appear.
 3. **Ordering, no cap.** Candidates are deduplicated by creative, sorted by
    CPM (publisher-approved creatives win ties), and reordered so each
-   campaign's best creative comes first. **The full pool is kept** — no
-   top-N cut. Serve-time selection needs losers to learn from; an auction
-   that discards them would silently disable exploration.
+   campaign's best creative comes first. **The full pool from the eligible
+   campaigns is kept** — no further cut at ordering time. Serve-time
+   selection needs losers to learn from; an auction that discarded them
+   would silently disable exploration.
 4. **Caching.** The pool is written to the ServeIndex — a replicated,
    locally-readable cache described in [The Cluster](./cluster.md) — with a
    TTL.
