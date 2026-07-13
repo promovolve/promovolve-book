@@ -6,7 +6,7 @@ Promovolve separates its workload into two distinct phases with fundamentally di
 
 The classify phase is traffic-driven, not scheduled — there is no crawler and no cron. When a page's first visitor arrives and the serve misses, the ad tag itself extracts the live page's text and slot geometry in the browser and POSTs it to `/v1/classify-page`. The endpoint replies `202 Accepted` immediately and hands the payload to the SiteEntity, which single-flights classification per URL (concurrent visitors don't trigger duplicate LLM calls). This is the "heavy" computation path, and it never blocks a serve.
 
-Freshness is governed by a token: every serve response carries `reclassifyInMs`, computed from the publisher's content-recency window (default 48 hours, publisher-configurable). Fresh pages don't re-classify on every serve; only when the window lapses does the ad tag send text again.
+Freshness is governed by a token: every serve response carries `reclassifyInMs`, computed from the publisher's classification-freshness window (default 48 hours). Fresh pages don't re-classify on every serve; only when the window lapses does the ad tag send text again.
 
 ```mermaid
 graph TD
@@ -33,7 +33,7 @@ The serve phase handles every ad request and must be extremely fast.
 graph TD
     User["User Request (page load)"] --> API["API Node (HTTP, port 8080)"]
     API --> Lookup["Lookup ServeIndex from local DData<br/>Key: siteId|slotId → Vector of CandidateView"]
-    Lookup --> Recency["Content Recency Filter<br/>classifiedAtMs within 48h window"]
+    Lookup --> Recency["Classification Freshness Filter<br/>classifiedAtMs within 48h window"]
     Recency --> FreqCap["Frequency Cap Check<br/>(100ms timeout, fail-open)<br/>query AdvertiserEntity per user"]
     FreqCap --> Rate["Rate Tracking<br/>(synchronous EMA, 1s window, α=0.3)"]
     Rate --> Pacing["Pacing Gate (PI control)<br/>aggregate budget from CachedSpendInfo<br/>throttle probability 0.0–0.99"]

@@ -28,7 +28,7 @@ graph LR
     Auctioneer --> ServeIndex["ServeIndex<br/>(DData)"]
 ```
 
-1. **On-demand classification** — when a page's first visitor arrives, the ad tag extracts the live page's text in the browser and posts it up; an LLM (Gemini Flash) classifies the content into IAB taxonomy categories. No crawler, no schedule — pages classify when readers prove they exist, and stay fresh for the publisher's content-recency window (48h default).
+1. **On-demand classification** — when a page's first visitor arrives, the ad tag extracts the live page's text in the browser and posts it up; an LLM (Gemini Flash) classifies the content into IAB taxonomy categories. No crawler, no schedule — pages classify when readers prove they exist, and stay fresh for the publisher's classification-freshness window (48h default).
 2. **AuctioneerEntity** — one per site, sharded across the Pekko cluster — runs a batch auction. It collects bids from all campaigns whose target categories match the page content, applies pacing throttles, and shortlists multiple candidates per ad slot (not just a single winner). Bids are honest CPMs; quality-adjusted second-price clearing at serve time means there's no upside to bid shading, so no campaign-side bid optimizer is needed.
 3. **ServeIndex** — a replicated in-memory cache built on Pekko Distributed Data (DData) — stores the shortlisted candidates. Every node in the cluster holds a local replica, so no remote call is needed at serve time.
 
@@ -80,7 +80,7 @@ The result: serve latency under 1ms, with no user data collected, no cookies set
 | Candidate model | Single winner | Multi-candidate with diversity |
 | Budget control | Per-campaign throttling | Aggregate PI-controlled pacing |
 | State persistence | Database/Redis | DData (replicated in-memory) |
-| Content scope | Any page, any time | Recency only (< 48h) |
+| Content scope | Any page, any time | Classification-fresh only (re-classified every 48h by live traffic) |
 | Targeting | User profiles, cookies | Content classification (LLM) |
 | Failure mode | No ad shown | Serve cached candidates |
 | Privacy | User tracking required | No user profiles; even pins live in the reader's browser |

@@ -6,7 +6,7 @@ Before any auction can run, the system must understand what a page is about. Pag
 
 Classification has no schedule and no crawler. It is triggered by traffic: when a page's first visitor arrives and the serve misses, the ad tag extracts the live page's text and slot geometry in the browser and POSTs it to `/v1/classify-page`. The endpoint replies `202 Accepted` immediately; SiteEntity single-flights the classification per URL, so concurrent visitors don't stack duplicate LLM calls.
 
-Freshness is a token, not a timer: each serve response carries `reclassifyInMs`, computed from the publisher's content-recency window (default 48 hours). While the token is positive, the ad tag doesn't re-send text — fresh pages are never re-classified per serve. A page nobody visits never classifies, and has no impressions to sell, so that's correct by design.
+Freshness is a token, not a timer: each serve response carries `reclassifyInMs`, computed from the publisher's classification-freshness window (default 48 hours). While the token is positive, the ad tag doesn't re-send text — fresh pages are never re-classified per serve. A page nobody visits never classifies, and has no impressions to sell, so that's correct by design.
 
 ## One Taxonomy, One Match
 
@@ -49,7 +49,7 @@ AuctioneerEntity selects the **top K categories** (default K=3) by confidence sc
 
 ## Classification Storage
 
-The durable copy lives in `SiteEntity.pageClassifications`, keyed by page URL and timestamped with `classifiedAt`. The AuctioneerEntity keeps an in-memory `lastPage` map — (categories, slots, `classifiedAt`) per URL — for re-auctions without re-extracting the page. It's reseeded at boot via `RestoreClassifications` and recovered per-URL from SiteEntity when a `Reevaluate` misses. Every 5 minutes, a cleanup task removes entries older than the recency window.
+The durable copy lives in `SiteEntity.pageClassifications`, keyed by page URL and timestamped with `classifiedAt`. The AuctioneerEntity keeps an in-memory `lastPage` map — (categories, slots, `classifiedAt`) per URL — for re-auctions without re-extracting the page. It's reseeded at boot via `RestoreClassifications` and recovered per-URL from SiteEntity when a `Reevaluate` misses. Every 5 minutes, a cleanup task removes entries older than the freshness window.
 
 ## Role in Scoring
 

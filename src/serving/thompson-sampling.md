@@ -65,7 +65,7 @@ Folds share the same bucket as impressions and clicks at the same minute — thr
 Thompson Sampling runs **after** the pacing gate and frequency cap filter:
 
 ```
-ServeIndex lookup → Content recency → Frequency cap → Pacing gate → Thompson Sampling → Budget reservation
+ServeIndex lookup → Classification freshness → Frequency cap → Pacing gate → Thompson Sampling → Budget reservation
 ```
 
 This ordering is critical — the pacing gate decides whether to serve **at all** (volume gating), while Thompson Sampling decides **which creative** to show (choice). Running pacing before TS prevents exploration bias.

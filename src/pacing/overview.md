@@ -47,7 +47,7 @@ graph LR
 Pacing operates as a **volume gate** before Thompson Sampling:
 
 ```
-Content recency → Frequency cap → Rate tracking → Pacing gate → Thompson Sampling
+Classification freshness → Frequency cap → Rate tracking → Pacing gate → Thompson Sampling
 ```
 
 The pacing gate makes a Bernoulli decision: `if random() < throttleProbability → skip (204)`. This gates volume, not choice — Thompson Sampling only runs for requests that pass the gate.

@@ -10,7 +10,7 @@ The serve pipeline runs in this order:
 
 ```
 1. ServeIndex lookup          → fetch cached candidates (local DData replica)
-2. Content recency             → drop if classification is older than 48h
+2. Classification freshness           → drop if classification is older than 48h
 3. Frequency cap               → drop creatives this user has seen too often
 4. Pacing gate                 → probabilistic throttle by aggregate budget
 5. Site-wide pin exclusion     → off-page pins remove campaigns from the pool
@@ -58,7 +58,7 @@ This is deliberate. Without the consume, a non-pinned slot on the same page coul
 
 A pin can fail for two reasons:
 
-**Transient miss.** The pinned creative is still approved on this site, but it isn't in this particular batch's pool — maybe the auction's eligibility filters happened to drop it (size mismatch with the slot, recency window, etc.). The reader's bookmark is still valid; the client should keep the pin and re-honor on the next page.
+**Transient miss.** The pinned creative is still approved on this site, but it isn't in this particular batch's pool — maybe the auction's eligibility filters happened to drop it (size mismatch with the slot, freshness window, etc.). The reader's bookmark is still valid; the client should keep the pin and re-honor on the next page.
 
 **Truly removed.** The pinned creative has been revoked from approval — campaign paused, creative unassigned, advertiser removed. The bookmark is dead; the client should clean up its IDB entry.
 

@@ -34,9 +34,9 @@ The defining architectural choice of Promovolve is that auctions run **ahead of 
 
 ## Periodic Re-Auction
 
-After the initial classification, the system runs **periodic re-auctions** every 5 minutes (`promovolve.auction.reauction-interval`) for recent content within the 48-hour recency window. Additionally, event-driven re-auctions trigger on campaign/advertiser state changes (approve, pause, budget events) on a 1-second debounce.
+After the initial classification, the system runs **periodic re-auctions** every 5 minutes (`promovolve.auction.reauction-interval`) for recent content within the 48-hour freshness window. Additionally, event-driven re-auctions trigger on campaign/advertiser state changes (approve, pause, budget events) on a 1-second debounce.
 
-## Content Recency Window
+## Classification Freshness Window
 
 Only pages classified within the last **48 hours** participate in auctions. Every 5 minutes, AuctioneerEntity runs cleanup to remove classifications older than 48 hours.
 
@@ -45,6 +45,6 @@ Only pages classified within the last **48 hours** participate in auctions. Ever
 | Parameter | Value | Env Var |
 |-----------|-------|---------|
 | Re-auction interval | 5 minutes | `REAUCTION_INTERVAL` |
-| Content recency | 48 hours (default; publisher-configurable) | — |
+| Classification freshness | 48 hours (default) | — |
 | ServeIndex TTL | 120 minutes | — |
 | Taxonomy ask timeout | 800ms | — |

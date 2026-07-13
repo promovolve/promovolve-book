@@ -156,7 +156,7 @@ Thompson Sampling doesn't run on every request. It sits behind several gates:
 
 ```
 Request arrives
-  → Content recency check (is the page fresh enough?)
+  → Classification freshness check (is the page fresh enough?)
   → Frequency cap check (has this user seen this ad too many times?)
   → Rate tracking (record this request for pacing)
   → Pacing gate (PI controller: should we serve or skip?)

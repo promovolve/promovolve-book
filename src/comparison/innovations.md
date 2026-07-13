@@ -38,7 +38,7 @@ Promovolve's design choices form a coherent system where each innovation enables
 
 **Traditional**: A page classified once stays in the system forever, whether or not anyone still reads it.
 
-**Promovolve**: A classification is only good for the **48-hour recency window** (publisher-configurable). Pages whose traffic continues simply re-classify when the window lapses — the ad tag's freshness token triggers it — while pages nobody visits expire out of the system. AuctioneerEntity prunes stale classifications every 5 minutes. Note this keys off the *classification* timestamp, not the article's publication date — evergreen content with live readers keeps serving.
+**Promovolve**: A classification is only good for the **48-hour freshness window**. Pages whose traffic continues simply re-classify when the window lapses — the ad tag's freshness token triggers it — while pages nobody visits expire out of the system. AuctioneerEntity prunes stale classifications every 5 minutes. Note this keys off the *classification* timestamp, not the article's publication date — evergreen content with live readers keeps serving.
 
 **Why it matters**: State stays bounded to what readers actually visit, re-classification picks up content changes, and the LLM cost is one call per page per window — driven by real traffic, not a crawl schedule.
 
@@ -80,7 +80,7 @@ Promovolve's design choices form a coherent system where each innovation enables
 
 **Why it matters**: Adapts to any traffic pattern without manual tuning. Learns from past days' mistakes.
 
-## 10. Publisher-Side Floor RL
+## 10. Publisher-Side Floor Optimization
 
 **Traditional**: Floors are static or set by exchange-side heuristics outside the publisher's view.
 
@@ -108,7 +108,7 @@ graph TD
     TS --> PI["Self-tuning PI pacing<br/>(smooth delivery within days)"]
     PI --> Spend["Buffered spend recording<br/>(correctness at scale)"]
     PI -.-> FloorSweep["Publisher-side floor sweep<br/>(slow loop, post-pacing revenue)"]
-    Spend --> FloorRL
+    Spend --> FloorSweep
 ```
 
 Each choice enables the next. Remove the magazine format and the dog-ear has nowhere to live; remove fluid creatives and the format collapses back to fixed-size banners; remove quality-adjusted clearing and bid shading returns. Together, they create an ad platform that is fast, learning, privacy-preserving, reader-respectful, and publisher-aligned.

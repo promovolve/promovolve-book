@@ -34,7 +34,7 @@ For Yuki's article, the LLM returns:
 
 Translated: Travel (653) with high confidence, Adventure Travel (665), and Asia Travel (657). The system now knows what this page is about — in a language that advertisers understand.
 
-The result is persisted with a timestamp, and that timestamp matters: for the next 48 hours (Yuki's content-recency window — she can tune it), the page counts as fresh and won't be re-classified. One LLM call per page per window, not per reader.
+The result is persisted with a timestamp, and that timestamp matters: for the next 48 hours (the classification-freshness window), the page counts as fresh and won't be re-classified. One LLM call per page per window, not per reader.
 
 If the LLM is down, the circuit breaker trips after 5 consecutive failures and stops trying for 30 seconds. The page just doesn't get classified this time — the single-flight slot is released, and the next reader's visit retries. No crash, no degradation of the serving path.
 

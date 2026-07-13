@@ -11,8 +11,8 @@ From the AdServer source code, the exact order of operations:
    Key: "siteId|slotId"
    → Vector[CandidateView]
 
-2. Content Recency Filter
-   Keep if: (now - classifiedAtMs) ≤ contentRecencyWindowMs (48h)
+2. Classification Freshness Filter
+   Keep if: (now - classifiedAtMs) ≤ classificationFreshnessWindowMs (48h)
 
 3. Frequency Cap Check (if userId provided AND any caps exist)
    → Group candidates by advertiserId

@@ -4,7 +4,7 @@ Between classification refreshes, the system keeps the ServeIndex fresh through 
 
 ## Periodic Re-Auction
 
-AuctioneerEntity runs a full re-auction every **5 minutes** (`promovolve.auction.reauction-interval`, env: `REAUCTION_INTERVAL`) for all pages within the 48-hour content recency window.
+AuctioneerEntity runs a full re-auction every **5 minutes** (`promovolve.auction.reauction-interval`, env: `REAUCTION_INTERVAL`) for all pages within the 48-hour classification freshness window.
 
 ## Event-Driven Re-Auction
 
