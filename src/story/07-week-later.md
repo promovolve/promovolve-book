@@ -129,11 +129,11 @@ He increases his daily budget to $30.
 
 Yuki hasn't touched her site's floor CPM all week — but it's not the same number it started at.
 
-The publisher-side floor RL agent has been watching the bid spread on Yuki's site. Most of the week, four campaigns have been competing for her slots at $3, $4, $5, and $8 — a wide enough spread (>1.5×) that floor adjustments can plausibly move outcomes without collapsing fill. The agent nudged the floor from $0.50 to $0.80 over five days. Fill stayed healthy; clearing prices on cold-start serves came in higher; Yuki's revenue ticked up about 6% on top of what the auction itself was earning her.
+The publisher-side floor sweep optimizer has been quietly experimenting on Yuki's site. Most of the week, four campaigns have been competing for her slots at $3, $4, $5, and $8 — enough spread that where the floor sits actually moves outcomes. The sweep tried candidate floors, measured what each actually earned in served revenue, and kept the winner — nudging the floor from $0.50 to $0.80 over five days. Fill stayed healthy; clearing prices on cold-start serves came in higher; Yuki's revenue ticked up about 6% on top of what the auction itself was earning her.
 
 If the spread had been narrow — every bidder offering the same CPM — the agent would have stayed put. Moving the floor in a homogeneous market just shrinks fill without raising prices. The agent is gated by exactly this signal.
 
-This is the only RL agent in the system, and it runs on the publisher's side. Advertisers see honest second-price clearing regardless of where the floor sits.
+There is no learning algorithm behind it — just controlled measurement, rediscovering the revenue-optimal floor each cycle. It runs on the publisher's side; advertisers see honest second-price clearing regardless of where the floor sits.
 
 ## The System Keeps Learning
 

@@ -76,7 +76,7 @@ The result: serve latency under 1ms, with no user data collected, no cookies set
 | Winner selection | Highest bid wins | Fair selection → Thompson Sampling |
 | Price model | Second-price (GSP) on bids only | Quality-adjusted second-price: `sampledCTR × CPM^α` |
 | Price discovery | Yes (competitive) | Yes (competitive, quality-adjusted) |
-| Learning | RTB feedback loops | TS + category ranking + traffic shape + publisher-side floor RL |
+| Learning | RTB feedback loops | TS + category ranking + traffic shape + publisher-side floor sweep |
 | Candidate model | Single winner | Multi-candidate with diversity |
 | Budget control | Per-campaign throttling | Aggregate PI-controlled pacing |
 | State persistence | Database/Redis | DData (replicated in-memory) |

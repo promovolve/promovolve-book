@@ -71,7 +71,7 @@ Promovolve's design choices form a coherent system where each innovation enables
 **Traditional**: Simple rules ("spend X% by noon") or fixed-gain controllers.
 
 **Promovolve**: PI controller with:
-- **Adaptive gains** scaled by traffic volatility (CV)
+- **Fixed base gains** (Kp 0.5 / Ki 0.3) refined at runtime by self-tuning
 - **Self-tuning overpace multiplier** (1.5×–5.0×, adjusts every 20 samples)
 - **Oscillation detection** (stddev threshold 0.08 → dampening)
 - **Leaky integrator** (decay 0.995, anti-windup)
@@ -84,7 +84,7 @@ Promovolve's design choices form a coherent system where each innovation enables
 
 **Traditional**: Floors are static or set by exchange-side heuristics outside the publisher's view.
 
-**Promovolve**: A per-site RL agent tunes the publisher's minimum floor CPM based on observed bid spread and post-pacing served revenue. Activates only when bid spread is wide enough to make floor adjustments meaningful (>1.5×).
+**Promovolve**: A per-site — and per-category — sweep optimizer tunes the publisher's floor CPM by testing candidate floors against post-pacing served revenue and keeping the argmax. Not RL: no value function, no policy — just controlled measurement. Only approved demand teaches floors; a single-bidder category pegs straight to that bid.
 
 **Why it matters**: The publisher's tool, not the exchange's. Honest second-price clearing for advertisers; floor optimization for the publisher.
 
@@ -107,7 +107,7 @@ graph TD
     Pin --> TS["Thompson Sampling<br/>(quality-adjusted score, second-price clearing)"]
     TS --> PI["Self-tuning PI pacing<br/>(smooth delivery within days)"]
     PI --> Spend["Buffered spend recording<br/>(correctness at scale)"]
-    PI -.-> FloorRL["Publisher-side floor RL<br/>(slow loop, post-pacing revenue)"]
+    PI -.-> FloorSweep["Publisher-side floor sweep<br/>(slow loop, post-pacing revenue)"]
     Spend --> FloorRL
 ```
 

@@ -12,6 +12,10 @@ class TrafficShapeTracker(
 )
 ```
 
+Production constructs every tracker with `interpolateVolumes = true`, so
+the pacing rate multiplier ramps across hour boundaries instead of
+stepping at each one; the sharp default exists for tests.
+
 ### Separate Weekday/Weekend Profiles
 
 ```scala
@@ -24,22 +28,30 @@ The active shape is selected via `setDayType(isWeekend: Boolean)` at the start o
 
 ## Recording & Learning
 
-### Per-Request Recording
+Every arriving ad request is recorded — the shape measures **demand
+opportunities** (requests), not impressions or spend:
 
 ```
 recordRequest(bucket, time):
     todayCount[bucket] += 1
 ```
 
-### On Bucket Boundary Change
+### Bootstrap: first day only
 
-When traffic moves to a new hour:
+A brand-new tracker (no snapshot, no rollover yet) also applies a
+per-bucket EMA as each hour completes, so pacing gets rough shape
+awareness within the very first day:
 
 ```
 observation = requestsInBucket / max(1.0, emaBucketRequests)
 shape[bucket] = α × observation + (1 - α) × shape[bucket]
 emaBucketRequests = α × requestsInBucket + (1 - α) × emaBucketRequests
 ```
+
+This bootstrap mode switches off permanently at the first day rollover
+(or when a persisted shape is restored). From then on, **a learned shape
+changes only at the daily blend below** — snapshots, restores, and
+restarts never mutate it mid-day.
 
 ### Day Rollover Blending
 
@@ -52,7 +64,7 @@ rolloverDay(dayAlpha = 0.2):
     reset todayCount
 ```
 
-The 0.2 blend rate means about 5 days of data to significantly influence the profile.
+The 0.2 blend rate means about 5 days of data to significantly influence the profile. The weekday and weekend shapes each blend on their own days, and **both persist to Postgres and restore on restart** — snapshots are written hourly, at each rollover, and on shutdown, so learned patterns survive deploys.
 
 ## CDF for Expected Spend
 
@@ -96,23 +108,17 @@ relativeVolumeWithFeedforward(elapsedSeconds, feedforwardWindow):
 
 The feedforward window (default: 0.0 = disabled) allows the system to anticipate the next hour's traffic pattern and begin adjusting before the bucket boundary.
 
-## Volatility Measurement
+## Learn-Only, By Design
 
-The coefficient of variation (CV = stddev / mean) of the shape buckets is used to auto-tune PI gains:
-- Low CV → uniform traffic → gentle PI gains
-- High CV → spiky traffic → aggressive PI gains
+Shapes are **never configured by hand** — there is deliberately no
+import API or UI. A hand-authored shape encodes intuition rather than
+measurement, and a wrong shape paces worse than the flat one (flat
+degrades to exactly linear pacing). The tracker is the only writer; the
+learned shapes are visible on the publisher's Floor Decisions page as
+two hourly bar rows (weekday and weekend) and exported read-only via
+the site stats endpoint.
 
-## Site-Level Configuration
-
-Per-site traffic shapes can be pre-configured via `PacingConfig`:
-
-```scala
-PacingConfig(
-  weekdayShapeVolumes: Option[Vector[Double]],  // 24 hourly values
-  weekendShapeVolumes: Option[Vector[Double]],
-  dayDurationSeconds: Int = 86400,
-  warmupMode: Boolean = false
-)
-```
-
-When `warmupMode = true`, the system records traffic patterns but does not serve ads — useful for learning the traffic shape of a new site before enabling monetization.
+The one related knob is `PacingConfig.warmupMode`: when `true`, the
+system records traffic patterns but does not serve ads — useful for
+learning the traffic shape of a new site before enabling monetization.
+Exiting warmup is a manual decision.

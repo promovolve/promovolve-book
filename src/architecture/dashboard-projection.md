@@ -161,11 +161,24 @@ Folds and "dogeared impressions" are the format-specific metrics:
 - **Unfolds** — counted on `processUnfold`. Used to compute the **pin retention rate**: `(folds − unfolds) / folds`. An advertiser sees how many readers actually came back versus folded then changed their minds.
 - **Dogeared impressions** — impressions served because of an honored pin. The journal flags them with `dogeared = true`; `processImpression` calls `bumpDogearedImpression` which adds to a parallel set of `dogeared_impressions` counters across `campaign_stats` / `creative_stats` / `campaign_hourly_stats` / `campaign_daily_stats`.
 
-The key thing is that **dogeared impressions are still billable impressions** — they roll up into the primary `impressions` and `total_spend` counters like any other serve, AND into the `dogeared_impressions` counter as a separate dimension. Wait, that contradicts [Pin-Honoring](../serving/pin-honoring.md), where pinned re-encounters bypass clearing entirely…
+The key thing is that **dogeared impressions are counted exclusively, not
+additively**. `processImpression` early-returns for a dogeared event
+before every primary metric: no `impressions`, no `total_spend`, no
+hourly/daily/advertiser-summary rollups, and no CTR or affinity-learning
+dispatch. Only the parallel `dogeared_impressions` (and
+`dogeared_clicks` / `dogeared_cta_clicks`) counters move. This matches
+[Pin-Honoring](../serving/pin-honoring.md): a pinned re-encounter is
+bookmark fulfillment — the reader already saw and chose this creative —
+so it neither bills nor teaches the auction anything.
 
-It actually doesn't, but the seam needs explaining. The pin-honor path emits a `BatchSlotOutcome` with `clearingPrice = CPM.zero` and skips reservation. When the bootstrap fires the impression beacon, the `cpm` field on that beacon is zero. So in the journal: `dogeared = true`, `cpm = 0`. In the aggregates: `impressions += 1`, `total_spend += 0`. Dogeared impressions are counted but priced free, exactly as the pin-honoring chapter describes.
-
-The dashboard surfaces this as a sub-counter: "Impressions: N (of which dogeared: M)" and "Spend: $X" where the dogeared portion contributes nothing to spend. Advertisers see how much of their reach is reader-driven rather than auction-driven, and it's free.
+The consequence for every primary number on the dashboard: they mean
+**fresh, auction-won, paid encounters only**. The free re-exposure earned
+by folds is a separate surface — the advertiser report shows it as an
+Engagement block (folds, fold rate, dogeared views/clicks/CTA clicks,
+explicitly marked as $0 and not part of the totals above). A reader who
+folds and then sees the creative ten more times contributes 1 fold,
+10 dogeared impressions, $0 of spend — and leaves the campaign's CTR
+untouched.
 
 ## Backfill and replay
 

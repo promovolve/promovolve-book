@@ -88,7 +88,7 @@ Bidding the highest CPM doesn't automatically win the slot. Promovolve scores ea
 
 ### Publisher-side learning, not advertiser-side bid wars
 
-Promovolve has no campaign-side reinforcement learning agent. With second-price quality-adjusted auctions, bid shading is counterproductive — there's nothing for an RL agent to learn that the auction mechanism doesn't already enforce. The reinforcement learning that does exist runs on the publisher side: a per-site agent tunes the floor CPM upward when bid spread suggests the market can bear it, and downward when fill suffers. The publisher's revenue improves; advertisers see honest second-price clearing.
+Promovolve has no reinforcement learning agent anywhere — not on the campaign side, and not on the publisher side either. With second-price quality-adjusted auctions, bid shading is counterproductive — there's nothing for an RL agent to learn that the auction mechanism doesn't already enforce. Floor pricing is handled by a deliberately simpler mechanism: a per-site (and per-category) **sweep optimizer** that tests candidate floors against real served revenue and keeps the argmax — measurement, not learning. The publisher's revenue improves; advertisers see honest second-price clearing.
 
 ### Budget pacing adapts to reality
 

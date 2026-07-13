@@ -28,7 +28,7 @@ The exploiting winner doesn't pay its own bid. It pays the minimum CPM that woul
 
 ### 5. Self-Tuning PI Pacing
 
-A PI controller with adaptive gains, traffic shape learning (separate weekday/weekend 24-hour profiles), oscillation detection, and leaky integrator anti-windup smooths budget delivery. It learns that traffic peaks at 10am and dips at 3pm, and adjusts automatically. A separate publisher-side RL agent tunes the floor CPM upward when bid spread suggests the market can bear it, and downward when fill suffers.
+A self-tuning PI controller, traffic shape learning (separate weekday/weekend 24-hour profiles), oscillation detection, and leaky integrator anti-windup smooth budget delivery. It learns that traffic peaks at 10am and dips at 3pm, and adjusts automatically. A separate publisher-side **floor sweep optimizer** tests candidate floor CPMs against real served revenue and keeps whichever earns most — per category, continuously.
 
 ### 6. The Magazine Format and the Dog-Ear
 
@@ -36,7 +36,7 @@ A Promovolve creative is an expandable, multi-page magazine spread, not a static
 
 ## The Result
 
-Sub-millisecond ad serving. Continuous learning at four layers (per-request Thompson Sampling, per-auction category ranking, daily traffic shapes, continuous PI tuning) plus publisher-side floor RL. Reader-controlled bookmarks instead of advertiser-controlled retargeting. Graceful degradation when budgets exhaust. No user tracking. Publisher approval over every creative.
+Sub-millisecond ad serving. Continuous learning at four layers (per-request Thompson Sampling, per-auction category ranking, daily traffic shapes, continuous PI tuning) plus publisher-side floor sweep optimization. Reader-controlled bookmarks instead of advertiser-controlled retargeting. Graceful degradation when budgets exhaust. No user tracking. Publisher approval over every creative.
 
 ## Navigating This Book
 

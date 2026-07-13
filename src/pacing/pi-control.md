@@ -1,6 +1,6 @@
 # PI Control Loop
 
-Promovolve uses a **self-tuning Proportional-Integral (PI) controller** with adaptive gains, asymmetric response, a leaky integrator, and oscillation detection.
+Promovolve uses a **self-tuning Proportional-Integral (PI) controller** with fixed base gains (Kp = 0.5, Ki = 0.3) refined at runtime by self-tuning, asymmetric response, a leaky integrator, and oscillation detection.
 
 ## Core Algorithm (from AdaptivePacing.scala)
 
@@ -72,18 +72,6 @@ Every 20 samples (and at least 500ms apart):
 ```
 
 This means the system becomes progressively more aggressive at correcting overspend if it keeps recurring, and relaxes when pacing is good.
-
-## Adaptive Gains by Traffic Volatility
-
-PI gains scale with the coefficient of variation (CV) of request rates:
-
-| Volatility (CV) | Kp | Ki | Behavior |
-|-----------------|----|----|----------|
-| 0.0 (flat) | 0.3 | 0.2 | Gentle corrections for uniform traffic |
-| 0.5 (typical) | 0.5 | 0.3 | Moderate response |
-| 1.0+ (spiky) | 1.0 | 0.6 | Aggressive corrections for bursty traffic |
-
-Gains are linearly interpolated between these points based on the observed CV from the TrafficShapeTracker.
 
 ## Leaky Integrator
 

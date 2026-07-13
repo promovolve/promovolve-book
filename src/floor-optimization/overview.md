@@ -234,7 +234,26 @@ So if the publisher's site minimum is $5:
 The publisher doesn't have to set a different minimum for every slot. They
 set one site-level minimum, the system adjusts it per slot.
 
-(More on this in [Per-Slot Priors](./per-slot-priors.md).)
+## Per-category floors
+
+The same sweep also runs **per demand category**, and those floors are the
+ones targeted advertisers actually pay against — the site-wide sweep is
+the fallback for categories that don't have their own floor yet. Two
+rules keep them honest:
+
+- **Only approved demand teaches floors.** A pending creative (not yet
+  approved by the publisher) bids and can win its way into the approval
+  queue, but its bids never move a floor. When a category's approved
+  demand drops to zero, its floor collapses to the minimum immediately
+  instead of draining over a sweep cycle.
+- **A single approved bidder pegs the floor to their bid.** With one
+  advertiser there is nothing to measure — their bid *is* the
+  revenue-optimal reserve — so the floor follows it directly, and the
+  sweep takes over only when a second bidder appears.
+
+Publishers can watch all of this on the Floor Decisions page: the live
+per-category floors, the sweep's evidence table, and the learned traffic
+shapes driving pacing.
 
 ---
 

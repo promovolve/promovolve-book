@@ -58,6 +58,32 @@ The data model:
 - Bucket mutations target `page.banners[sizeKey]`.
 - `page.layout` holds the generated 16:9 wide artifact.
 
+## Shared image and text binding
+
+The expanded (portrait reader) view is the single source of truth, and
+four rules keep every size consistent with it:
+
+- **One image per page.** Whatever image page 1 of the expanded view
+  shows *is* the image — `page.img` is reconciled from it at load, every
+  size's hero is bound to it, and "Replace image…" fans the change out.
+  There is no per-size image choice and no pin/unpin control; sizes only
+  place and crop the shared image.
+- **Text content is field-bound.** Headline/sub/body live once on the
+  page and every size resolves them live. A per-size **"Synced across
+  all sizes"** checkbox is the escape hatch: unticked, that size's text
+  *and color* edits stay local; re-ticking adopts the local version as
+  the new shared one everywhere.
+- **Color can be scoped per page.** Headline and body each carry a
+  "Sync color across all 3 pages" checkbox (operable from page 1,
+  default on), and the page background color has the same toggle — so a
+  dark opener and a light closer can each keep legible text without
+  fighting a global color.
+- **Deletion is one-source.** Removing a field-bound text item from the
+  expanded reader removes that field from every size — not on the
+  expanded page means it doesn't exist. Font face, weight, and
+  proportional size always stay one identity per field across
+  everything.
+
 The size-matrix UI shows all sizes side-by-side as thumbnails so the author can spot mismatches and re-fan-out. The [LP-to-creative pipeline](./lp-to-creative.md) seeds both the portrait reader and the wide artifact in stage 3 (the paired Gemini call); the aspect buckets fill from deterministic presets.
 
 Because the format is fluid (see [Fluid Creatives](./fluid-creatives.md)), no advertiser authors per-pixel IAB sizes — the bucket layouts scale into every slot of a similar shape. Buckets exist because a composition that works at 9:16 needs a genuinely different arrangement at 728×90.
@@ -72,6 +98,8 @@ interface Page {
   sub?: string;
   body?: string;
   caption?: string;
+  img?: string;                  // THE page image — one per page, shared by every size
+  imgEmoji?: string;
   bg?: string;                   // page background color
   isCTA?: boolean;
   ctaUrl?: string;
