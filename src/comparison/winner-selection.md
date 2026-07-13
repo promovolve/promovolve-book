@@ -129,7 +129,8 @@ Thompson Sampling doesn't run in isolation. It's one step in a pipeline, and its
 2. Pin-honor check       → if the slot carries a dog-ear pin and the pinned
                            creative is still in the pool, bypass everything
                            below and serve the pin (free re-encounter)
-3. Content recency       → drop candidates if page content is stale (> 48h)
+3. Content recency       → drop candidates whose classification is stale
+                           (> 48h since the page was last classified)
 4. Frequency cap         → drop candidates the user has seen too many times
 5. Pacing gate           → probabilistic throttle based on aggregate budget utilization
 6. Thompson Sampling     → score and select among remaining candidates

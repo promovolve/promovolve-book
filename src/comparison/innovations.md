@@ -34,13 +34,13 @@ Promovolve's design choices form a coherent system where each innovation enables
 
 **Why it matters**: Privacy-preserving (no GDPR/CCPA data collection), simpler infrastructure (no profile database), content-value alignment (ads match what the user is currently reading).
 
-## 5. Recency-Only Monetization
+## 5. Classification-Freshness Window
 
-**Traditional**: Ads on any page, regardless of publication date.
+**Traditional**: A page classified once stays in the system forever, whether or not anyone still reads it.
 
-**Promovolve**: Only content within the **48-hour recency window** participates. AuctioneerEntity prunes older classifications every 5 minutes.
+**Promovolve**: A classification is only good for the **48-hour recency window** (publisher-configurable). Pages whose traffic continues simply re-classify when the window lapses — the ad tag's freshness token triggers it — while pages nobody visits expire out of the system. AuctioneerEntity prunes stale classifications every 5 minutes. Note this keys off the *classification* timestamp, not the article's publication date — evergreen content with live readers keeps serving.
 
-**Why it matters**: Fresh content has higher engagement → higher CTR → better outcomes for all participants. Reduces low-quality inventory.
+**Why it matters**: State stays bounded to what readers actually visit, re-classification picks up content changes, and the LLM cost is one call per page per window — driven by real traffic, not a crawl schedule.
 
 ## 6. Periodic Batch Auctions
 
