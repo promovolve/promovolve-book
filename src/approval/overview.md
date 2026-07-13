@@ -35,7 +35,7 @@ The AuctioneerEntity shortlists multiple candidates per ad slot and sends them t
 
 ### 2. AdServer determines actual approval status
 
-Instead of relying on the `preApproved` flag (which comes from a probabilistic Cuckoo filter (in the misleadingly-named `BloomFilter.scala` — rejections must be *deletable* for revoke/unreject, which a true Bloom filter can't do) and can have false positives), the AdServer queries the ServeIndex to see which creatives are *actually* serving:
+Instead of relying on the `preApproved` flag (which comes from a probabilistic Cuckoo filter (rejections must be *deletable* for revoke/unreject, which a true Bloom filter can't do — the ops live beside `CuckooFilter.scala`) and can have false positives), the AdServer queries the ServeIndex to see which creatives are *actually* serving:
 
 ```
 existingCreativeIds =
