@@ -5,7 +5,8 @@ is not a stylistic preference — half the system's design depends on it.
 
 ## Collapsed and expanded
 
-In the page, the creative is *collapsed*: a cover — image, headline, an
+In the page, the creative — the ad artifact itself, the thing readers see —
+is *collapsed*: a cover — image, headline, an
 advertiser tag — occupying whatever rectangle the publisher provided. Tapped,
 it expands into a full-screen overlay the reader swipes through like a small
 magazine: a cover page, a story page, and a call-to-action page. Collapse it
@@ -32,7 +33,8 @@ billable event.
 ## Fluid, not fixed-size
 
 A creative is a *layout*, not a bitmap. The same creative renders into a
-leaderboard, a rectangle, or a half-page rail; the renderer reads the slot's
+wide leaderboard strip, a boxy rectangle, or a tall half-page rail — the
+shapes ad slots traditionally come in; the renderer reads the slot's
 geometry at mount time and reflows — container queries, not server-side
 variants. Publishers offer whatever slot shapes suit their design;
 advertisers maintain one creative instead of a matrix of sizes. This is what

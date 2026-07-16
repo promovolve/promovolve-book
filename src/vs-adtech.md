@@ -28,8 +28,9 @@ learning system: engagement posteriors sharpen with every impression, new
 creatives get exploration in proportion to their uncertainty, and the
 formula (`engagement × CPM^α`) lets a well-made ad beat a well-funded one.
 
-**Bid landscapes → nothing to optimize.** DSPs exist substantially to shade
-bids. Quality-adjusted second pricing removes the incentive: your price is
+**Bid landscapes → nothing to optimize.** DSPs — *demand-side platforms*,
+the bidding software advertisers hire to play the exchanges — exist
+substantially to shade bids. Quality-adjusted second pricing removes the incentive: your price is
 set by the runner-up and discounted by your own engagement rate. Promovolve
 ships no bid optimizer, and that absence is a feature of the mechanism, not
 a missing roadmap item.
@@ -49,8 +50,10 @@ revenue, measured, not modeled.
 
 Honesty requires the other column. Programmatic ad tech delivers **scale
 and liquidity** Promovolve does not: demand from thousands of buyers through
-open exchange protocols, remnant fill for any inventory anywhere, and
-cross-site campaign tooling (reach, frequency, brand-lift measurement) that
+open exchange protocols, remnant fill (a buyer of last resort for any
+unsold slot anywhere), and cross-site campaign tooling — reach, frequency
+capping (limiting how often one person sees an ad), brand-lift measurement
+— that
 a content-targeted, single-platform system structurally cannot offer. RTB's
 per-impression auction also prices *this reader now* — worth real money for
 performance advertisers — where Promovolve deliberately prices only *this

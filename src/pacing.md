@@ -11,7 +11,8 @@ feedback loop, self-tuned by observation.
 Pacing acts at serve time as a probabilistic gate ahead of selection: each
 request, each campaign is throttled with some probability; a throttled
 campaign sits the impression out. The probability comes from a **PI
-controller** on the spend ratio:
+controller** — the thermostat's algorithm: correct in proportion to
+today's error and to its accumulated history — watching the spend ratio:
 
 ```
 error      = smoothed(actualSpend / expectedSpend) − 1

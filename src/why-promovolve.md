@@ -6,8 +6,9 @@ placed by people who cared about the page they appeared on, tolerated — often
 enjoyed — by readers because they belonged there. A travel magazine carried
 airline ads. A cooking magazine carried knife ads. Nobody was tracked.
 
-The programmatic era traded that away for real-time auctions over user
-profiles. The result is familiar: consent banners, ad blockers, fraud,
+The *programmatic* era — ads bought and sold by machines, in auctions run
+inside the milliseconds a page takes to load — traded that away for bidding
+over user profiles. The result is familiar: consent banners, ad blockers, fraud,
 clickbait inventory, and an arms race of bid optimizers playing each other
 instead of serving anyone. Publishers get a shrinking share of spend routed
 through a chain of intermediaries. Advertisers get impressions on pages they
@@ -46,8 +47,11 @@ it actually operates — including the parts that are deliberately simple and
 the ideas that were tried and dropped. Where the text names a class, the
 class exists; where a mechanism was removed, the book says so.
 
-The chapters that follow tell the story once, quickly, through the eyes of a
-page and a reader — and then take each mechanism apart: the ad format, the
+The next chapter defines the trade itself — publisher, advertiser,
+impression, auction — from zero, for readers who have never bought or sold
+an ad; skip it if you have. The chapters after it tell the story once,
+quickly, through the eyes of a page and a reader — and then take each
+mechanism apart: the ad format, the
 creative pipeline, classification, the auction, approval, serve-time
 selection, pricing, pacing, floors, and the cluster underneath it all. The
 last chapter measures the design against conventional ad tech, difference by

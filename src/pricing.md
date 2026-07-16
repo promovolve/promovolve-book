@@ -28,8 +28,10 @@ Two properties fall out:
   identically. Advertisers improve their price by improving their ad.
 - **Bidding is honest.** Raising your bid above what's needed doesn't raise
   your price (the runner-up sets it); lowering it only risks losing. There
-  is no bid-shading strategy to compute, which is why Promovolve ships no
-  campaign-side bid optimizer — the mechanism leaves nothing for one to do.
+  is no bid-shading strategy to compute (*shading*: bidding below your true
+  value to dodge overpaying — the daily homework of first-price auctions),
+  which is why Promovolve ships no campaign-side bid optimizer — the
+  mechanism leaves nothing for one to do.
 
 The runner-up is taken from the winner's own content category, so the price
 reflects real competition for *this kind of page*, not an accidental
@@ -58,6 +60,8 @@ the bid. A campaign bidding $8 into thin competition might spend $2.10 per
 thousand — its budget lasts proportionally longer, and the advertiser's
 reports show the price they actually paid. Every spend event flows through
 buffered, deduplicated, at-least-once recording into a double-entry ledger
-in micro-dollars; settlement splits gross into platform margin (an
-effective-dated basis-point rate) and publisher earnings, one idempotent row
+in micro-dollars (millionths of a dollar — integer arithmetic, so the books
+never accumulate rounding drift); settlement splits gross into platform margin (a percentage set in basis
+points — hundredths of a percent — that can change on a dated schedule) and
+publisher earnings, one idempotent row
 per advertiser–campaign–site–day.

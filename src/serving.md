@@ -19,7 +19,9 @@ What remains is selection over the candidate pool.
 ## Score by sampling, not by averages
 
 Each creative carries a rolling 60-minute window of impressions, clicks, and
-folds, bucketed by minute. From it, two Beta distributions:
+folds, bucketed by minute. (CTR below is *click-through rate*: of the
+readers who saw this creative, the share who opened it.) From it, two Beta
+distributions:
 
 ```
 sampledCTR  ~ Beta(clicks + 1,  impressions − clicks + 1)
@@ -53,7 +55,8 @@ Publishers wanting discovery set 0.3; wanting revenue, 0.7.
 
 ## Cold start, inside the same formula
 
-New creatives get two helps, both expressed as scores — there is no separate
+The *cold start* is the ranking problem's awkward first day: how do you
+score an ad with no history? New creatives get two helps, both expressed as scores — there is no separate
 cold-start code path, round-robin, or forced serving:
 
 - **Zero impressions:** the CTR draw is replaced by the creative's category
@@ -64,7 +67,8 @@ cold-start code path, round-robin, or forced serving:
   decaying linearly to zero — a guaranteed runway against confident
   incumbents, gone by the time the creative has real data.
 
-Selection stays a single argmax at every lifecycle stage.
+Selection stays a single argmax — take the highest score, nothing else — at
+every lifecycle stage.
 
 ## Filling the page
 

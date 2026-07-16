@@ -14,13 +14,14 @@ gets a `403`.
 
 She drops one script tag into her template. Her slots are just `div`s with
 dimensions. There is nothing else to configure — no ad server UI, no line
-items, no size negotiations.
+items (the hand-negotiated delivery contracts of traditional ad servers),
+no size negotiations.
 
 ## An advertiser signs up
 
 Kenta owns a pilates studio. He has no design team and no creative agency —
 he has a landing page. He gives Promovolve the URL, a daily budget, and a
-CPM bid. The platform's pipeline reads his landing page in a real browser,
+CPM bid — the price he's willing to pay per thousand views of his ad. The platform's pipeline reads his landing page in a real browser,
 extracts its images, copy, and colors, has an LLM rewrite the copy into a
 three-page magazine narrative, renders it, and shows him the result. He
 picks the categories his campaign should appear against — *Fitness*,

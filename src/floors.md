@@ -2,7 +2,8 @@
 
 A floor price protects a publisher from selling attention below its worth —
 set too low, second-price clearing grinds toward zero in thin competition;
-set too high, fill rate collapses. Publishers shouldn't have to guess this
+set too high, fill rate — the share of slots that
+actually serve an ad — collapses. Publishers shouldn't have to guess this
 number, so Promovolve measures it.
 
 ## Sweep, don't learn
@@ -19,7 +20,7 @@ agent mostly learned noise. What replaced it is controlled measurement:
    revenue** — actual post-pacing, post-selection earnings, not theoretical
    clearing prices. Revenue is the only honest objective; anything upstream
    of it can be gamed by the very systems the floor interacts with.
-2. **Exploit.** Take the argmax and hold it for a longer exploitation
+2. **Exploit.** Take the argmax — the floor that earned the most — and hold it for a longer exploitation
    period. Ties within tolerance resolve to the *higher* floor — the same
    revenue on fewer impressions, and more robust if the dominant bidder's
    value drifts up. The optimizer only fails open to the lowest floor when

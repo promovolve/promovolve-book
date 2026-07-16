@@ -18,8 +18,9 @@ workers.) Instead:
    `202 Accepted` immediately. Classification never blocks serving.
 3. The site's entity classifies the text with an LLM (Gemini, currently
    `gemini-2.5-flash`) into **IAB Content Taxonomy 3.0** categories — the
-   top three, with confidence scores. Campaigns register demand against the
-   same taxonomy, so matching is a direct category lookup with ancestor
+   top three, with confidence scores. Campaigns register their demand —
+   the categories they want to buy — against the same taxonomy, so matching
+   is a direct category lookup with ancestor
    expansion (a page about *Baseball* matches a campaign targeting
    *Sports*); there is no intermediate mapping layer.
 

@@ -1,7 +1,7 @@
 # The Periodic Auction
 
-Real-time bidding runs an auction per impression and gives each one a few
-milliseconds. Promovolve inverts this: auctions run *ahead of* impressions —
+Real-time bidding — conventional ad tech's model — runs an auction per
+impression and gives each one the few milliseconds a page load can spare. Promovolve inverts this: auctions run *ahead of* impressions —
 when a page is classified, on a periodic tick, and when the world changes —
 and their results are cached. Serving then reads the cache. The auction can
 afford to be thoughtful because nobody is waiting on it.
