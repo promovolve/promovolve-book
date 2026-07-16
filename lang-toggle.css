@@ -1,0 +1,17 @@
+.lang-toggle {
+    display: inline-block;
+    padding: 3px 10px;
+    margin: 5px 8px;
+    border: 1px solid var(--icons);
+    border-radius: 4px;
+    color: var(--icons) !important;
+    font-size: 0.85em;
+    text-decoration: none !important;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.lang-toggle:hover {
+    color: var(--icons-hover) !important;
+    border-color: var(--icons-hover);
+}

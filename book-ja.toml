@@ -1,11 +1,11 @@
 [book]
 authors = ["Promovolve Team"]
-language = "en"
-src = "src"
-title = "Promovolve: The Design of a Tracking-Free Ad Network"
+language = "ja"
+src = "src-ja"
+title = "Promovolve: トラッキングしない広告ネットワークの設計"
 
 [build]
-build-dir = "book/en"
+build-dir = "book/ja"
 
 [output.html]
 default-theme = "navy"
