@@ -26,12 +26,20 @@ Two properties fall out:
 - **Quality is a discount.** A creative readers engage with needs a lower
   CPM to hold its rank, so it *pays less* than a mediocre creative bidding
   identically. Advertisers improve their price by improving their ad.
-- **Bidding is honest.** Raising your bid above what's needed doesn't raise
-  your price (the runner-up sets it); lowering it only risks losing. There
-  is no bid-shading strategy to compute (*shading*: bidding below your true
-  value to dodge overpaying — the daily homework of first-price auctions),
-  which is why Promovolve ships no campaign-side bid optimizer — the
-  mechanism leaves nothing for one to do.
+- **Bidding is honest — where there is competition.** Raising your bid
+  above what's needed doesn't raise your price (the runner-up sets it);
+  lowering it only risks losing. Floors reinforce this rather than
+  undermining it: in a competitive category the floor is capped below
+  the second bid, so it can never wedge itself between you and the
+  runner-up and become your price. There is no bid-shading strategy to
+  compute (*shading*: bidding below your true value to dodge overpaying
+  — the daily homework of first-price auctions), which is why Promovolve
+  ships no campaign-side bid optimizer — the mechanism leaves nothing
+  for one to do. The honest exception: a category *monopolist* pays
+  ~99% of whatever they bid, because the floor tracks their bid (see
+  [Floor Optimization](./floors.md)). That is first-price-like by
+  design — full extraction where no runner-up exists to set a price —
+  and it lasts exactly until a second bidder shows up.
 
 The runner-up is taken from the winner's own content category, so the price
 reflects real competition for *this kind of page*, not an accidental
@@ -47,8 +55,11 @@ cross-category comparison.
   still clear above it.
 - **No runner-up → floor.** A lone candidate pays the floor. (What stops
   floors from collapsing in a one-bidder market is the floor optimizer —
-  see [Floor Optimization](./floors.md) — which pegs the floor to a lone
-  bidder's bid.)
+  see [Floor Optimization](./floors.md) — which pegs the floor to 99% of
+  a lone bidder's bid. Combined with this pricing rule, that is how "a
+  monopolist pays what they offered" is actually implemented: no code
+  charges the bid directly; the floor walks up to it and the no-runner-up
+  path prices at the floor.)
 - **Pinned re-encounters are free.** A dog-eared creative serving to the
   reader who bookmarked it clears at zero. The reader's memory is not
   inventory.

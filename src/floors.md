@@ -14,12 +14,19 @@ built, evaluated, and dropped: with pacing and Thompson Sampling already
 adapting around every floor change, credit assignment was hopeless, and the
 agent mostly learned noise. What replaced it is controlled measurement:
 
-1. **Sweep.** Generate candidate floors across the plausible range (bounded
-   below by observed rejected bids, above by the best observed bid). Hold
-   each candidate for a fixed number of auction ticks, measuring **served
-   revenue** — actual post-pacing, post-selection earnings, not theoretical
-   clearing prices. Revenue is the only honest objective; anything upstream
-   of it can be gamed by the very systems the floor interacts with.
+1. **Sweep.** Generate candidate floors across the plausible range —
+   bounded below by observed rejected bids, above by **99% of the
+   second-highest approved bid**. Not the top bid: any floor between the
+   second and top bid manufactures a monopoly (only the top bidder
+   clears), and since each campaign fills at most one slot per page,
+   pricing out the rest of the field forfeits their fill for a few
+   percent more on one impression. A floor may price out the bottom of
+   the field, never the top two; extraction above the second bid is
+   second-price clearing's job, not the reserve's. Hold each candidate
+   for a fixed number of auction ticks, measuring **served revenue** —
+   actual post-pacing, post-selection earnings, not theoretical clearing
+   prices. Revenue is the only honest objective; anything upstream of it
+   can be gamed by the very systems the floor interacts with.
 2. **Exploit.** Take the argmax — the floor that earned the most — and hold it for a longer exploitation
    period. Ties within tolerance resolve to the *higher* floor — the same
    revenue on fewer impressions, and more robust if the dominant bidder's
@@ -44,12 +51,26 @@ Two guardrails matter more than the sweep itself:
   the approval queue) but are invisible to the optimizer — otherwise an
   unapproved, possibly rejected campaign could inflate a floor that outlives
   it.
-- **A lone bidder pegs the floor to its bid.** With one approved bidder
-  there is no second price and nothing to sweep; the floor snaps to the bid
-  (and instantly back down when the bidder leaves — validated live in both
-  directions). And with *zero* approved demand the floor collapses to the
-  minimum immediately: a floor with nobody to price against is pure
-  fill-rate damage.
+- **A lone bidder pegs the floor to 99% of its bid.** With one approved
+  bidder there is no second price and nothing to sweep; the floor snaps
+  to just under the bid — the 1% headroom guarantees the bidder always
+  clears its own floor — and instantly re-derives when the field changes
+  (validated live in both directions, including pausing the top bidder
+  mid-flight). And when there is no demand that can actually serve —
+  zero approved bidders, *or* bidders whose every bid the floor has
+  priced out — the floor collapses to the minimum immediately: demand
+  that cannot serve is not demand, and a floor with nobody to price
+  against is pure fill-rate damage.
+
+- **Slot quality can only discount a floor, never raise it.** The floor a
+  bid must actually beat is the category floor scaled by the slot's
+  engagement prior, clamped at 1.0× — a weak slot may price below the
+  category floor to attract fill, but a premium slot never surcharges
+  above it. The invariant this preserves is the one every guardrail here
+  serves: *the floor a bidder faces is never derived from their own bids
+  plus a markup.* Each rule alone looked safe with a multiplier above it;
+  composed, they once strangled a live category — so the invariant is now
+  enforced at the layer auctions actually consume.
 
 One honest caveat: in a perfectly homogeneous market — every bidder at the
 same CPM — every floor below the common bid earns identical revenue, and the
