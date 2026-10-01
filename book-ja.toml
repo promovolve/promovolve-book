@@ -8,6 +8,7 @@ title = "Promovolve: トラッキングしない広告ネットワークの設�
 build-dir = "book/ja"
 
 [output.html]
+mathjax-support = true
 default-theme = "navy"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/promovolve/promovolve-book"
