@@ -8,6 +8,7 @@ title = "Promovolve: The Design of a Tracking-Free Ad Network"
 build-dir = "book/en"
 
 [output.html]
+mathjax-support = true
 default-theme = "navy"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/promovolve/promovolve-book"

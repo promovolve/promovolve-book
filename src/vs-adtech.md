@@ -26,7 +26,7 @@ ad tech gives advertisers.
 learns whether the winner was any good. Promovolve's selection is a
 learning system: engagement posteriors sharpen with every impression, new
 creatives get exploration in proportion to their uncertainty, and the
-formula (`engagement × CPM^α`) lets a well-made ad beat a well-funded one.
+formula (\\( \text{engagement} \times \text{CPM}^{\alpha} \\)) lets a well-made ad beat a well-funded one.
 
 **Bid landscapes → nothing to optimize.** DSPs — *demand-side platforms*,
 the bidding software advertisers hire to play the exchanges — exist

@@ -23,18 +23,16 @@ folds, bucketed by minute. (CTR below is *click-through rate*: of the
 readers who saw this creative, the share who opened it.) From it, two Beta
 distributions:
 
-```
-sampledCTR  ~ Beta(clicks + 1,  impressions − clicks + 1)
-sampledFold ~ Beta(folds + 1,   impressions − folds  + 1)
-```
+\\[ \text{sampledCTR} \sim \text{Beta}(\text{clicks} + 1,\ \text{impressions} - \text{clicks} + 1) \\]
+
+\\[ \text{sampledFold} \sim \text{Beta}(\text{folds} + 1,\ \text{impressions} - \text{folds} + 1) \\]
 
 Every request, every candidate **draws** from its distributions — it does
 not use its mean. The score:
 
-```
-engagement = sampledCTR + 2.0 × sampledFold + newcomerBonus
-score      = engagement × CPM^α
-```
+\\[ \text{engagement} = \text{sampledCTR} + 2.0 \times \text{sampledFold} + \text{newcomerBonus} \\]
+
+\\[ \text{score} = \text{engagement} \times \text{CPM}^{\alpha} \\]
 
 Sampling is the whole trick (this is Thompson Sampling). A creative with
 1,000 impressions draws values tightly around its true rate; a creative with
@@ -61,7 +59,7 @@ cold-start code path, round-robin, or forced serving:
 
 - **Zero impressions:** the CTR draw is replaced by the creative's category
   affinity score (how well its category matched the page at auction time)
-  plus uniform noise of ±0.15, and the fold draw comes from a `Beta(1, 3)`
+  plus uniform noise of ±0.15, and the fold draw comes from a \\( \text{Beta}(1, 3) \\)
   prior. A relevance-informed guess instead of a coin flip.
 - **First 50 impressions:** an additive newcomer bonus starting at +0.5 and
   decaying linearly to zero — a guaranteed runway against confident

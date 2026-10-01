@@ -15,10 +15,9 @@ for every candidate at once. The probability comes from a **PI
 controller** — the thermostat's algorithm: correct in proportion to
 today's error and to its accumulated history — watching the spend ratio:
 
-```
-error      = smoothed(actualSpend / expectedSpend) − 1
-throttle   = clamp(Kp·error + Ki·integral, 0, 0.99)
-```
+\\[ \text{error} = \text{smoothed}\left(\frac{\text{actualSpend}}{\text{expectedSpend}}\right) - 1 \\]
+
+\\[ \text{throttle} = \text{clamp}\left(K_p \cdot \text{error} + K_i \cdot \text{integral},\ 0,\ 0.99\right) \\]
 
 Overspending pushes the throttle up; underspending lets it fall. The
 controller is deliberately asymmetric — over-pacing errors are amplified by

@@ -1,7 +1,7 @@
 # What the Winner Pays
 
 Promovolve is second-price at heart: the winner pays what was needed to win,
-not what they offered. But the score that wins is `engagement × CPM^α`, not
+not what they offered. But the score that wins is \\( \text{engagement} \times \text{CPM}^{\alpha} \\), not
 a bare bid — so the clearing price must be quality-adjusted too.
 
 ## Sample for allocation, price on means
@@ -13,9 +13,7 @@ posterior means**: after the winner is chosen, the runner-up's score is
 recomputed from mean engagement rates, and the winner pays the minimum CPM
 at which it *still would have won*:
 
-```
-clearingCPM = (runnerUpScore / winnerEngagement)^(1/α)
-```
+\\[ \text{clearingCPM} = \left(\frac{\text{runnerUpScore}}{\text{winnerEngagement}}\right)^{1/\alpha} \\]
 
 clamped between the slot's floor and the winner's own bid. Intuition: invert
 the scoring formula and ask, "with your engagement rate, what's the cheapest

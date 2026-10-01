@@ -6,10 +6,9 @@
 
 ペーシングは配信時、選択の手前で確率的なゲートとして働きます。リクエストは丸ごと通されるか絞られるかのどちらかで、その確率はページの需要全体の合算に対して計算されます——絞られたリクエストは、すべての候補が一斉にそのインプレッションを見送ります。確率は消化率に対する **PI コントローラー**——サーモスタットのアルゴリズム:今日の誤差への比例と、その累積履歴への比例で補正する——から来ます。
 
-```
-error      = smoothed(actualSpend / expectedSpend) − 1
-throttle   = clamp(Kp·error + Ki·integral, 0, 0.99)
-```
+\\[ \text{error} = \text{smoothed}\left(\frac{\text{actualSpend}}{\text{expectedSpend}}\right) - 1 \\]
+
+\\[ \text{throttle} = \text{clamp}\left(K_p \cdot \text{error} + K_i \cdot \text{integral},\ 0,\ 0.99\right) \\]
 
 使い過ぎはスロットルを押し上げ、使い足りなければ下がります。コントローラーは意図的に非対称です——超過側の誤差は乗数(基準2倍)で増幅されます。使い過ぎは取り返しがつかず、使い足りない分はあとで追い上げられるからです。
 
