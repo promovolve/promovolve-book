@@ -33,8 +33,8 @@ Yuki publishes an article about a hot-spring town at 6 a.m. At 6:14, the
 first reader arrives. The ad tag on the page asks for ads — and the server
 has never seen this URL. It answers with empty slots and a hint: *send me
 the text*. The tag extracts the article's text in the reader's own browser
-and posts it up. An LLM classifies it — *Travel*, *Asia Travel* — and the
-result is stored. That one reader saw no ads; every reader after them will.
+and posts it up. An LLM classifies it — *Travel*, *Asia Travel* — notes the
+place the article is about, and the result is stored. That one reader saw no ads; every reader after them will.
 
 Classification is good for 48 hours. If the article still has traffic after
 that, the next visit re-sends the text and the clock resets. Pages nobody
@@ -66,6 +66,10 @@ campaign at most per page. The winner's budget is reserved, the price is set
 by the runner-up rather than the winner's own bid, and the response carries
 the creative and its tracking URLs.
 
+The ad is not an impression yet. It becomes one when at least half of it
+has been on the reader's screen for one continuous second — only then is
+the advertiser billed. An ad scrolled straight past is free.
+
 ## The reader answers back
 
 The ad sits collapsed in the page, magazine-cover small. The reader taps; it
@@ -89,5 +93,5 @@ learned traffic shape absorbs today's rhythm — a 20% nudge toward what
 actually happened. Settlement writes the day's ledger: gross spend, platform
 margin, publisher earnings, one idempotent row per advertiser–campaign–site.
 
-Nobody was tracked. Nothing about the reader left their browser except a
-click. And every mechanism in this story is a chapter in this book.
+Nobody was tracked. Nothing that says who the reader is ever left their
+browser. And every mechanism in this story is a chapter in this book.

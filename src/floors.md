@@ -45,7 +45,7 @@ the site-level floor. The pathological case that motivated this — a lone
 high bidder pushing the site floor above everyone else — now prices one
 category at $12 while *Travel* still clears at $3.
 
-Two guardrails matter more than the sweep itself:
+Three guardrails matter more than the sweep itself:
 
 - **Only approved demand teaches floors.** Pending creatives bid (to reach
   the approval queue) but are invisible to the optimizer — otherwise an
