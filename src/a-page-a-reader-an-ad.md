@@ -87,11 +87,13 @@ share of impressions to one readers actually open.
 
 ## The day ends
 
-At midnight UTC, spend counters roll over, the pacing controller notes how
-today went and adjusts its aggressiveness for tomorrow, and the site's
-learned traffic shape absorbs today's rhythm — a 20% nudge toward what
-actually happened. Settlement writes the day's ledger: gross spend, platform
-margin, publisher earnings, one idempotent row per advertiser–campaign–site.
+At midnight in the advertiser's own timezone, that advertiser's spend
+counters roll over and the pacing controller notes how today went and
+adjusts its aggressiveness for tomorrow. The site's learned traffic shape
+keeps a UTC day; when it ends, the shape absorbs today's rhythm — a 20%
+nudge toward what actually happened. Settlement writes the day's ledger on
+each party's local day: gross spend, platform margin, publisher earnings,
+one idempotent row per advertiser–campaign–site.
 
 Nobody was tracked. Nothing that says who the reader is ever left their
 browser. And every mechanism in this story is a chapter in this book.
