@@ -51,8 +51,13 @@ Too low invites near-free clearing in thin competition; too high kills fill.
 ⊛ Promovolve measures floors per content category instead of asking the
 publisher to guess.
 
+**Frequency cap** — a limit on how often one reader sees a campaign. ⊛ In
+Promovolve the reader's own browser keeps the count, per site; the server
+never learns it.
+
 **Impression** — one person seeing one ad once. The atom of the business:
-counted, priced, paid for.
+counted, priced, paid for. ⊛ In Promovolve it counts only once *viewable*:
+half the ad on screen for one continuous second.
 
 **Inventory** — publisher-side supply: the slots (attention) a publisher
 has to sell.
@@ -72,6 +77,10 @@ spent by 9 a.m.
 
 **Publisher** — the party with readers and costs; sells impressions. In
 this book, usually a small content site.
+
+**Reach** — the number of different readers a campaign was shown to, as
+opposed to the number of impressions. ⊛ Promovolve counts it without reader
+IDs: each browser reports only when it last saw the campaign.
 
 **RTB (real-time bidding)** — conventional ad tech's model: an auction per
 impression, run in the ~100ms a page takes to load. ⊛ Promovolve replaces

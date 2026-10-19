@@ -10,6 +10,7 @@
 - [周期オークション](./auction.md)
 - [パブリッシャーの関門](./approval.md)
 - [配信の瞬間:トンプソン・サンプリング](./serving.md)
+- [見張らずに数える](./counting.md)
 - [勝者が支払う価格](./pricing.md)
 - [予算ペーシング](./pacing.md)
 - [フロア最適化](./floors.md)

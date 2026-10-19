@@ -10,6 +10,7 @@
 - [The Periodic Auction](./auction.md)
 - [The Publisher's Gate](./approval.md)
 - [Serve Time: Thompson Sampling](./serving.md)
+- [Counting Without Watching](./counting.md)
 - [What the Winner Pays](./pricing.md)
 - [Budget Pacing](./pacing.md)
 - [Floor Optimization](./floors.md)
