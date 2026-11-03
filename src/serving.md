@@ -77,10 +77,15 @@ page**. A page plastered with one advertiser is bad for the reader, the
 publisher, and the advertiser; the constraint is enforced at assignment
 time, where it can't be gamed.
 
-The winner's budget is reserved before the response is sent, and the
-impression is recorded server-side at selection — billing does not depend on
-a tracking pixel surviving the reader's browser. Clicks (expands), folds
-(dog-ears), and CTA events arrive later through tracking endpoints and
-update the Beta windows.
+One more exclusion comes from the reader's side: campaigns that have
+reached their frequency cap in this browser are named in the request and
+left out of the pool — see [Counting Without Watching](./counting.md).
+
+The winner's price is held against its daily budget before the response is
+sent, so concurrent requests cannot oversell the day. The impression itself
+is not counted yet. It counts when the reader's browser reports the ad was
+actually viewable — the next chapter — and that signed report is what bills
+the advertiser and adds to the Beta windows. Clicks (expands), folds
+(dog-ears), and CTA events arrive the same way.
 Dog-eared re-encounters update none of this: they live in separate counters,
 excluded from learning, spend, and reporting's primary metrics.

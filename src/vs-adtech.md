@@ -54,7 +54,9 @@ open exchange protocols, remnant fill (a buyer of last resort for any
 unsold slot anywhere), and cross-site campaign tooling — reach, frequency
 capping (limiting how often one person sees an ad), brand-lift measurement
 — that
-a content-targeted, single-platform system structurally cannot offer. RTB's
+a content-targeted, single-platform system structurally cannot offer.
+Promovolve counts reach and caps frequency too, but only
+[within one site](./counting.md). RTB's
 per-impression auction also prices *this reader now* — worth real money for
 performance advertisers — where Promovolve deliberately prices only *this
 page*.
